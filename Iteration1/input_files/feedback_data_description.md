@@ -1,0 +1,5 @@
+The failure of the model to learn the tSZ signal is directly attributable to the dataset's extreme class imbalance and dynamic range disparity, which are inherent in the provided FLAMINGO component maps. 
+
+1. **Constraint**: The dataset description provides the target tSZ maps in their raw, physical units (dimensionless Compton-y) without pre-applied normalization.
+2. **Impact**: As noted in the results, the tSZ signal is extremely sparse and subdominant (variance $3.28 \times 10^{-12}$) compared to the CIB (variance $3.35 \times 10^{10}$). Because the dataset description does not mandate or provide pre-normalized targets, the model optimized for the majority background pixels, leading to the observed "model collapse" where the network predicts a near-zero constant.
+3. **Affected Conclusions**: The model's inability to reconstruct physical structures (as evidenced by the $r_\ell = 0$ cross-correlation and the failure of the signal-injection test) is a direct consequence of this data-level constraint, rendering the current training results physically meaningless.
