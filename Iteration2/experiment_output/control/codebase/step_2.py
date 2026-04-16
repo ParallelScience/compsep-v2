@@ -3,8 +3,8 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath("codebase"))
 sys.path.insert(0, "/home/node/data/compsep_data/")
-sys.path.insert(0, '/home/node/data/compsep_data/')
 import numpy as np
+sys.path.insert(0, '/home/node/data/compsep_data')
 import utils
 BASE = '/home/node/data/compsep_data/cut_maps'
 def get_beam_window(N, L_rad, fwhm_in, fwhm_out):
