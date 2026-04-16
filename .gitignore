@@ -18,3 +18,5 @@ __pycache__/
 
 # parallelArXiv working directory
 **/parallel_arxiv_output/
+*.pth
+**/*.pth
