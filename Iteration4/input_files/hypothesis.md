@@ -1,0 +1,10 @@
+**Hypothesis: Disentangling Baryonic Feedback via Self-Supervised Contrastive Learning of tSZ-CIB Morphological Priors.**
+
+While previous iterations successfully used CIB as a spatial guide via gated cross-attention, the model remains heavily reliant on the specific FLAMINGO HYDRO_FIDUCIAL simulation priors, leading to potential "over-fitting" to the simulation's specific AGN feedback prescription. I hypothesize that by introducing a **Self-Supervised Contrastive Learning (SSCL) objective**—specifically a "Morphological Consistency" task—the model can learn to disentangle the tSZ signal from the CIB background more robustly. 
+
+Instead of relying solely on the supervised reconstruction of the ground-truth tSZ map, the model will be trained to maximize the similarity between the latent representations of patches that share similar CIB morphological features (e.g., filamentary structures vs. point-like sources) while minimizing the similarity between patches with distinct baryonic pressure profiles. By incorporating a **Contrastive Loss (e.g., NT-Xent)** alongside the existing multi-scale spectral loss, the network will be forced to learn a representation of the "baryonic state" that is invariant to the specific noise realization and more sensitive to the underlying gas physics. 
+
+This approach aims to:
+1. **Reduce Simulation Dependency:** By learning morphological features rather than pixel-to-pixel mappings, the model should generalize better to varying baryonic feedback intensities.
+2. **Improve Small-Scale Resolution:** The contrastive objective will act as a regularizer that prevents the "spectral collapse" or "peak attenuation" observed in previous iterations by enforcing structural consistency in the latent space.
+3. **Validate Physicality:** We will test if the latent space clusters by known physical parameters (e.g., halo mass or feedback intensity), providing a diagnostic tool to verify if the model is learning true astrophysical signatures rather than just noise-fitting.
