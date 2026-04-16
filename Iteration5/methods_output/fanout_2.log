@@ -1,0 +1,274 @@
+
+###### PROMPT BEGINS ########
+Human: You are provided with:
+- a description of the data
+- an idea
+- research plan to carry out the idea.
+
+Your task is to provide suggestions on how to improve the plan.
+Take into account and potential feedback (if any).
+If the plan is already good enough, do not give suggestions to improve it. If this is not first iteration, you will also be provided with the previous research plan along with some feedback on it. If this is the case, take into account the feedback provided when designing the new research plan. It is good to have a detailed plan, but not to have an overly complicated plan. If you dont have suggestions, just say that you dont have further suggestions. The idea should remain the same. No need to add code to the research plan, as another agent will write code given the research plan.
+
+Data description:
+# Dataset Description: FLAMINGO Lensed Component-Separation Maps
+
+This dataset consists of flat-sky cut maps derived from full-sky maps of the cosmic microwave background (CMB), thermal and kinetic Sunyaev-Zel'dovich effects (tSZ/kSZ), and the cosmic infrared background (CIB). The sky signal maps originate from the FLAMINGO L1_m9 HYDRO_FIDUCIAL simulation (lightcone0, Jeger rotation) — a large-volume (1 Gpc comoving box) hydrodynamical simulation with self-consistent baryonic physics (radiative cooling, star formation, AGN feedback, diffuse gas flows).
+
+The CMB is a Gaussian realization lensed by the FLAMINGO convergence map (κ) via lenspyx, using Planck-like cosmology (h=0.6736, n_s=0.965, A_s=2.1e-9, seed=42).
+
+## File Inventory (absolute paths, verified)
+
+All files are under `/home/node/data/compsep_data/cut_maps/`.
+
+### Individual component maps — ground truth, 1 arcmin beam
+Shape: **(1523, 256, 256)**, dtype **float64**
+
+- `/home/node/data/compsep_data/cut_maps/lensed_cmb.npy` — Lensed CMB temperature, µK_CMB
+- `/home/node/data/compsep_data/cut_maps/tsz.npy` — tSZ Compton-y parameter, dimensionless
+- `/home/node/data/compsep_data/cut_maps/ksz.npy` — kSZ Doppler-b parameter, dimensionless
+- `/home/node/data/compsep_data/cut_maps/cib_90.npy` — CIB at 90 GHz, Jy/sr (delta-bandpass)
+- `/home/node/data/compsep_data/cut_maps/cib_150.npy` — CIB at 150 GHz, Jy/sr (delta-bandpass)
+- `/home/node/data/compsep_data/cut_maps/cib_217.npy` — CIB at 217 GHz, Jy/sr (bandpass-integrated)
+- `/home/node/data/compsep_data/cut_maps/cib_353.npy` — CIB at 353 GHz, Jy/sr (bandpass-integrated)
+- `/home/node/data/compsep_data/cut_maps/cib_545.npy` — CIB at 545 GHz, Jy/sr (bandpass-integrated)
+- `/home/node/data/compsep_data/cut_maps/cib_857.npy` — CIB at 857 GHz, Jy/sr (bandpass-integrated)
+
+### Stacked (observed) signal maps — frequency-specific beam, no noise
+Shape: **(1523, 256, 256)**, dtype **float64**, units **µK_CMB**
+
+- `/home/node/data/compsep_data/cut_maps/stacked_90.npy` — 90 GHz total signal, beam FWHM 2.2 arcmin (SO LAT)
+- `/home/node/data/compsep_data/cut_maps/stacked_150.npy` — 150 GHz total signal, beam FWHM 1.4 arcmin (SO LAT)
+- `/home/node/data/compsep_data/cut_maps/stacked_217.npy` — 217 GHz total signal, beam FWHM 1.0 arcmin (SO LAT)
+- `/home/node/data/compsep_data/cut_maps/stacked_353.npy` — 353 GHz total signal, beam FWHM 4.5 arcmin (Planck HFI)
+- `/home/node/data/compsep_data/cut_maps/stacked_545.npy` — 545 GHz total signal, beam FWHM 4.72 arcmin (Planck HFI)
+- `/home/node/data/compsep_data/cut_maps/stacked_857.npy` — 857 GHz total signal, beam FWHM 4.42 arcmin (Planck HFI)
+
+The stacked signal is the linear mixture of all components in µK_CMB:
+  signal(freq) = CIB(freq)*jysr2uk(freq) + tSZ*f_tSZ(freq) + kSZ*f_kSZ + lensed_CMB
+then smoothed with the frequency-specific beam. Individual component maps have a 1 arcmin beam.
+
+### Noise maps
+
+**Simons Observatory (SO) LAT noise** — 3000 independent Gaussian realizations
+Shape: **(3000, 256, 256)**, dtype **float64**, units **µK_CMB**
+
+- `/home/node/data/compsep_data/cut_maps/so_noise/90.npy`
+- `/home/node/data/compsep_data/cut_maps/so_noise/150.npy`
+- `/home/node/data/compsep_data/cut_maps/so_noise/217.npy`
+
+SO noise is drawn from the SO LAT v3.1 temperature noise power spectrum (mode 2, elevation 50°, f_sky=0.4). 90 and 150 GHz are correlated (Cholesky decomposition); 217 GHz is independent. When sampling SO noise, the noise index does NOT need to match the sky patch index.
+
+**Planck FFP10 noise** — 100 MC realizations per high-frequency channel
+Shape: **(1523, 256, 256)**, dtype **float64**
+Filename pattern: `planck_noise_{freq}_{i}.npy`, freq ∈ {353, 545, 857}, i ∈ {0, …, 99}
+
+- `/home/node/data/compsep_data/cut_maps/planck_noise/planck_noise_353_{0..99}.npy` — units: K_CMB → multiply by 1e6 to get µK_CMB
+- `/home/node/data/compsep_data/cut_maps/planck_noise/planck_noise_545_{0..99}.npy` — units: MJy/sr → multiply by 1e6 * jysr2uk(545) to get µK_CMB
+- `/home/node/data/compsep_data/cut_maps/planck_noise/planck_noise_857_{0..99}.npy` — units: MJy/sr → multiply by 1e6 * jysr2uk(857) to get µK_CMB
+
+For Planck noise, the patch index MUST match the sky patch index.
+
+## Spectral Response and Utility Functions
+
+A `utils.py` module is available at `/home/node/data/compsep_data/utils.py`. **Always import it using the absolute path or by adding its directory to sys.path:**
+
+```python
+import sys
+sys.path.insert(0, '/home/node/data/compsep_data')
+import utils
+```
+
+Key functions in utils.py:
+- `utils.tsz(freq_ghz)` — tSZ spectral response in µK_CMB per Compton-y unit
+- `utils.ksz(freq_ghz)` — kSZ spectral response in µK_CMB (= -T_CMB_µK, frequency-independent)
+- `utils.jysr2uk(freq_ghz)` — converts Jy/sr to µK_CMB for CIB at given frequency
+- `utils.powers(a, b, ps=10, ell_n=199, window_alpha=None)` — flat-sky angular auto/cross power spectrum
+- `utils.get_patch_centers(gal_cut, step_size)` — returns list of (lon, lat) patch centers
+
+## Patch Geometry
+
+- 1523 patches, 5°×5°, 256×256 pixels, ≈1.17 arcmin/pixel
+- Full-sky tessellation at 5° step spacing (no galactic cut)
+- Gnomonic (flat-sky) projection, bilinear interpolation from HEALPix nside=8192
+
+## Loading Data (correct absolute paths)
+
+```python
+import sys
+sys.path.insert(0, '/home/node/data/compsep_data')
+import utils
+import numpy as np
+
+BASE = '/home/node/data/compsep_data/cut_maps'
+
+rng = np.random.default_rng(seed=42)
+n_patch = 1523
+n_planck = 100
+n_so = 3000
+
+i_patch = rng.integers(n_patch)   # sky patch index
+i_planck = rng.integers(n_planck) # Planck MC realization index
+i_so = rng.integers(n_so)         # SO noise index (does not need to match i_patch)
+
+# Load observed signal + noise at each frequency
+frequencies = [90, 150, 217, 353, 545, 857]
+patches = {}
+for freq in frequencies:
+    signal = np.load(f'{BASE}/stacked_{freq}.npy')[i_patch]  # µK_CMB
+    if freq <= 217:  # SO noise
+        noise = np.load(f'{BASE}/so_noise/{freq}.npy')[i_so]  # µK_CMB
+    else:  # Planck noise
+        raw = np.load(f'{BASE}/planck_noise/planck_noise_{freq}_{i_planck}.npy')[i_patch]
+        if freq == 353:
+            noise = raw * 1e6                        # K_CMB -> µK_CMB
+        else:
+            noise = raw * 1e6 * utils.jysr2uk(freq) # MJy/sr -> µK_CMB
+    patches[freq] = signal + noise  # µK_CMB
+
+# Load ground truth components
+cmb   = np.load(f'{BASE}/lensed_cmb.npy')[i_patch]  # µK_CMB
+tsz   = np.load(f'{BASE}/tsz.npy')[i_patch]          # Compton-y (dimensionless)
+ksz   = np.load(f'{BASE}/ksz.npy')[i_patch]          # Doppler-b (dimensionless)
+cib90 = np.load(f'{BASE}/cib_90.npy')[i_patch]       # Jy/sr
+```
+
+## CMB Simulation Cosmology
+
+CLASS parameters used:
+- A_s = 2.1e-9, n_s = 0.965, h = 0.6736
+- ω_b = 0.02237, ω_cdm = 0.12, τ_reio = 0.0544, Y_He = 0.2454
+
+## Hardware and Environment
+
+- Python: `/opt/denario-venv/bin/python`
+- *64 vCPUs* (AMD Ryzen Threadripper PRO 9995WX), *128 GB RAM*
+- *NVIDIA RTX PRO 6000 Blackwell Edition, 96 GB VRAM*, CUDA 13.0
+- PyTorch GPU: use `device='cuda'`
+- Multiprocessing: limit to ~8–16 workers to avoid oversubscription
+- Set `OMP_NUM_THREADS` when using NumPy/SciPy with multiprocessing
+- Load data patch-by-patch or in small batches; avoid loading all 1523 patches for all frequencies simultaneously (total data volume is large)
+
+
+Idea:
+**Title**: Spectral-Spatial Super-Resolution Denoising for Baryonic Pressure Mapping
+
+**Description**: This objective implements a Super-Resolution Denoising Autoencoder (SR-DAE) to reconstruct 1-arcmin resolution tSZ Compton-y maps from SO LAT-band observations (90, 150, 217 GHz), utilizing high-frequency CIB maps (353–857 GHz) as auxiliary features to guide the recovery of small-scale gas pressure fluctuations. The architecture employs a multi-scale U-Net with gated cross-attention, enabling the model to learn the spatial correlation between CIB-traced star-forming regions and ionized gas flows without assuming deterministic coupling. To ensure physical validity, the training objective minimizes a composite loss function: a pixel-wise L1-reconstruction loss for the tSZ ground truth and a spectral consistency term calculated via `utils.powers` that penalizes deviations from the FLAMINGO-simulated tSZ power spectrum. By conditioning on per-patch SO and Planck noise realizations, the SR-DAE effectively disentangles the non-Gaussian tSZ signal from the Gaussian CMB background and instrument noise. This approach specifically targets the 1–5 arcmin scale, where baryonic feedback signatures are most prominent, while preventing the hallucination of features by constraining the latent space representation to the known physical power distribution of the simulation.
+
+Research plan:
+1. **Baseline Implementation and Comparative Benchmarking**:
+    - Implement a Constrained Internal Linear Combination (cILC) and a Wiener Filter as the primary baselines. The cILC should be configured to null the CIB spectral signature while preserving the tSZ signal.
+    - Compute the transfer function $T(\ell)$ and the $Y_{SZ}-M$ scatter for both the SR-DAE and the linear baselines.
+    - Quantify the "gain" of the SR-DAE by calculating the ratio of the reconstruction error (MSE) and the $Y_{SZ}-M$ scatter relative to the linear baselines across the $\ell \in [1000, 5000]$ range.
+
+2. **Data Pipeline and Out-of-Distribution (OOD) Stress Testing**:
+    - Maintain the dynamic noise sampling pipeline but introduce a "Leave-One-Out" (LOO) validation strategy. Specifically, isolate the top 5% most massive clusters (merger-heavy environments) from the training set.
+    - Evaluate the model's performance on these OOD clusters to determine if the SR-DAE generalizes to extreme baryonic feedback scenarios or if it overfits to the average FLAMINGO morphology.
+
+3. **Architecture and Feature Attribution**:
+    - Utilize the multi-scale U-Net with gated cross-attention.
+    - Implement Integrated Gradients (IG) to generate saliency maps for the input channels (90, 150, 217 GHz and CIB channels).
+    - Analyze the IG maps to verify that the model is actively utilizing the SO-LAT channels for pressure reconstruction rather than relying solely on the CIB prior. This provides the causal evidence required to prove the integration of multi-frequency data.
+
+4. **Refined Residual and Bias Analysis**:
+    - Perform a spatial correlation analysis between the reconstruction residuals ($R = \text{Truth} - \text{Reconstruction}$) and the local CIB intensity.
+    - If residuals correlate with CIB intensity, implement a "CIB-debiasing" term in the loss function that penalizes the cross-correlation between the residual map and the input CIB maps, ensuring the model is not leaking CIB power into the tSZ reconstruction.
+
+5. **Probabilistic Framework Transition**:
+    - Transition the SR-DAE to a Conditional Diffusion Model (CDM) architecture to move from point-estimate reconstruction to posterior sampling.
+    - Train the model to learn the conditional distribution $p(\text{tSZ} | \text{Observed}, \text{Noise})$.
+    - Use the diffusion process to generate multiple realizations of the tSZ map for a given input, allowing for the calculation of pixel-wise variance maps as a proxy for model uncertainty.
+
+6. **Spectral Fidelity and Loss Function Optimization**:
+    - Retain the composite loss function (L1 + spectral consistency).
+    - Apply the spectral loss to the log of the power spectrum with $\ell^3$ weighting to emphasize high-frequency baryonic feedback signatures.
+    - Use a dynamic weighting schedule for the spectral loss to ensure the model first learns the large-scale structure before refining the small-scale pressure fluctuations.
+
+7. **Scientific Validation: $Y_{SZ}-M$ Relation**:
+    - Extract the $Y_{SZ}-M$ relation from the reconstructed maps using the FLAMINGO halo catalog.
+    - Compare the scatter and bias of the SR-DAE against the linear baselines.
+    - Assess whether the model preserves the physical variance of the simulation or if it regresses to the mean, particularly in high-mass, high-noise regimes.
+
+8. **Final Performance Reporting**:
+    - Consolidate metrics: $T(\ell)$, $Y_{SZ}-M$ scatter, residual-CIB correlation coefficients, and uncertainty quantification from the diffusion model.
+    - Provide a comparative summary demonstrating the SR-DAE's performance advantage over linear methods and its robustness to OOD merger events.
+
+Previous research plan:
+1. **Data Pipeline and Noise Conditioning**:
+    - Implement a `Dataset` class that dynamically samples SO and Planck noise realizations.
+    - Provide the model with the local noise variance (per-patch, per-frequency) as an auxiliary conditioning vector to allow the model to adapt its internal thresholding logic.
+    - Implement robust input normalization: use log-transforms or median/IQR scaling for CIB channels to manage the high dynamic range and prevent gradient dominance.
+    - Stratify the 1523-patch split by halo mass/tSZ intensity to ensure the validation set contains a representative sample of high-mass clusters for $Y_{SZ}-M$ analysis.
+
+2. **Architecture and Spectral Fidelity**:
+    - Utilize the multi-scale U-Net with gated cross-attention.
+    - Implement a composite loss function: pixel-wise L1 reconstruction loss plus a spectral consistency term.
+    - Apply the spectral loss to the *log* of the power spectrum, using $\ell^2$ or $\ell^3$ weighting to ensure high-$\ell$ modes (baryonic feedback) are not overwhelmed by low-$\ell$ power.
+    - Use a dynamic weighting schedule for the spectral loss ($\lambda_3$), increasing its influence as training progresses to prioritize coarse structure before fine-scale spectral constraints.
+
+3. **Transfer Function Analysis**:
+    - Compute the transfer function $T(\ell) = \sqrt{P_{recon}(\ell) / P_{truth}(\ell)}$ using `utils.powers` with Hann windowing to mitigate edge effects.
+    - Monitor $T(\ell)$ during training; if high-frequency recovery ($\ell > 5000$) lags, adjust $\lambda_3$ to prevent the model from acting as a low-pass filter.
+
+4. **Causal Validation and Hallucination Testing**:
+    - Perform "CIB-only" reconstruction: run the model with CIB inputs while setting SO-LAT channels to pure noise.
+    - Quantify hallucination risk by calculating the pixel-wise correlation between the CIB-only output and the ground truth tSZ map. A non-zero correlation indicates the model is mapping CIB features to tSZ rather than reconstructing gas pressure.
+
+5. **Residual Analysis for Bias Detection**:
+    - Calculate residuals $R = \text{Truth} - \text{Reconstruction}$.
+    - Perform correlation analysis between $R$ and the input/truth in both the pixel domain and the Fourier domain. This identifies if bias is scale-dependent (e.g., accurate at large scales but biased at small scales).
+
+6. **Curriculum Learning and Stability**:
+    - Execute two-stage training: Stage 1 (high-mass clusters) followed by Stage 2 (full dataset).
+    - Define a "High-Mass Cluster Benchmark" (fixed subset) to evaluate at the end of both stages.
+    - Quantify "forgetting" by measuring the change in $Y_{SZ}-M$ scatter for the top 10% most massive clusters to ensure stability.
+
+7. **Scientific Validation: $Y_{SZ}-M$ Relation**:
+    - Cross-match reconstructed maps with the FLAMINGO halo catalog to extract the $Y_{SZ}-M$ relation.
+    - Compare the scatter of the reconstructed $Y_{SZ}-M$ relation against the ground truth to determine if the model preserves physical variance or regresses to the mean.
+
+8. **Final Performance Reporting**:
+    - Consolidate metrics: global cross-correlation coefficient $r_\ell$ (using tapered windows), transfer function $T(\ell)$, residual correlation coefficients (pixel/Fourier), and $Y_{SZ}-M$ scatter.
+    - Provide a comprehensive assessment of the model’s physical fidelity and robustness to noise.
+
+Feedback on previous research plan:
+The current analysis demonstrates high technical proficiency in training a deep learning model for component separation, but it suffers from a "black box" validation strategy that risks over-claiming the model's physical robustness. While the $Y_{SZ}-M$ scatter results are impressive, they are currently circular: the model is trained on FLAMINGO and validated on the same simulation.
+
+**Critical Weaknesses & Gaps:**
+1. **The "Simulation-Specific" Trap:** The report acknowledges that performance is tied to FLAMINGO, but fails to test the model against the "known unknowns" of baryonic physics. You have not tested if the model is learning the *physics* of gas pressure or merely the *specific morphology* of the FLAMINGO AGN feedback implementation.
+2. **Missing Baseline:** You dismiss the Internal Linear Combination (ILC) as theoretically inferior without a quantitative comparison. To justify the complexity of an SR-DAE, you must demonstrate that it outperforms a standard constrained ILC or a Wiener filter in the specific regime of interest ($\ell > 3000$). Without this, the "improvement" is anecdotal.
+3. **Causal Validation Flaw:** The "CIB-only" test is necessary but insufficient. It proves the model doesn't hallucinate in the absence of LAT signal, but it does not prove the model is *correctly* using the LAT signal when it is present. The model could be ignoring the LAT data entirely and relying solely on the CIB prior.
+
+**Actionable Recommendations:**
+1. **Cross-Simulation Stress Test:** You have access to the FLAMINGO dataset. If possible, partition the data by sub-grid physics parameters (if available) or, at minimum, perform a "leave-one-out" test on the most massive clusters to see if the model's performance degrades when it encounters "out-of-distribution" merger events.
+2. **Quantify the "Gain" over Linear Methods:** Implement a standard ILC or a simple Wiener filter as a baseline. Compare the $Y_{SZ}-M$ scatter and the transfer function $T(\ell)$ against your SR-DAE. If the SR-DAE only provides a marginal improvement over a well-tuned Wiener filter, the added complexity is scientifically unjustifiable.
+3. **Feature Attribution (Saliency Maps):** Use Integrated Gradients or SHAP to visualize which input channels the model is actually "looking at" when reconstructing a high-mass cluster. This will provide the causal evidence needed to prove the model is integrating LAT and CIB data rather than just relying on the CIB prior.
+4. **Refine the Residual Analysis:** The residual bias $B(\ell)$ is reported as "flat," but the increase from 12% to 18% is significant. Perform a spatial correlation analysis between the residuals and the local CIB intensity. If the residuals are correlated with the CIB, the model is failing to fully disentangle the two components, indicating a systematic bias in the reconstruction of gas pressure in high-CIB environments.
+
+**Forward-Looking Insight:**
+Stop focusing on the "accuracy" of the reconstruction and start focusing on the "uncertainty." A model that provides a point estimate is less useful for cosmology than one that provides a posterior distribution. Future iterations should move toward a probabilistic framework (e.g., a Conditional Diffusion Model or a Bayesian Neural Network) to quantify the model's confidence in its reconstruction, which is the only way to make this tool viable for real-world CMB data analysis.
+
+
+Respond in this format:
+
+\\begin{SUGGESTIONS}
+<SUGGESTIONS>
+\\end{SUGGESTIONS}
+
+In <SUGGESTIONS> put the suggestions to improve the plan.
+
+###### PROMPT ENDS ########
+
+\begin{SUGGESTIONS}
+1. **Clarify the Baseline Implementation**: In Step 1, ensure the cILC implementation is explicitly "constrained" to null the CIB spectral signature. Since you have 6 frequency channels, you have sufficient degrees of freedom to perform a constrained ILC that nulls the CIB (using the known spectral response) while preserving the tSZ signal. This is a critical baseline to justify the SR-DAE.
+
+2. **Refine the OOD Strategy**: In Step 2, while "Leave-One-Out" on massive clusters is good, consider also performing a "noise-level" stress test. Since you have 3000 SO noise realizations, evaluate the model's performance on the "worst-case" noise realizations (e.g., the 95th percentile of noise power) to ensure the SR-DAE does not hallucinate pressure features when the input signal-to-noise ratio is low.
+
+3. **Integrate CIB-Debiasing into Training**: In Step 4, rather than just analyzing the correlation between residuals and CIB, move the "CIB-debiasing" term into the primary training objective (Step 6). By adding a penalty term $\mathcal{L}_{corr} = \text{corr}(R, \text{CIB})$ to the loss function, you force the model to learn a representation that is orthogonal to the CIB, which is more robust than post-hoc correction.
+
+4. **Streamline the Diffusion Transition**: Step 5 is a significant jump in complexity. To keep the plan manageable, ensure the transition to a Conditional Diffusion Model (CDM) is framed as a "Stage 2" effort. First, achieve a stable, high-performing SR-DAE (the point-estimate model) to establish the baseline, then use the SR-DAE architecture as the backbone for the CDM.
+
+5. **Data Efficiency**: Given the 64 vCPUs and 128 GB RAM, ensure the data pipeline in Step 1 explicitly mentions using `multiprocessing` to pre-load and augment patches in parallel. This will prevent the GPU from idling while waiting for the next batch of 1523 patches to be processed.
+
+6. **Validation Metric**: Add a "Null Test" in Step 7: run the model on pure noise (zero signal) to ensure the output is consistent with zero. This is a standard sanity check in CMB component separation to ensure the model isn't learning a "mean" tSZ map that it outputs regardless of the input.
+\end{SUGGESTIONS}
+
