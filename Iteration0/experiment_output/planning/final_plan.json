@@ -1,0 +1,68 @@
+{
+    "sub_tasks": [
+        {
+            "bullet_points": [
+                "Pre-load all large numpy arrays (stacked signal maps, ground truth tSZ, kSZ, CMB, and CIB maps) into RAM at initialization as memory-mapped or fully-loaded arrays.",
+                "Implement a custom torch.utils.data.Dataset that indexes into these arrays per patch during __getitem__.",
+                "Compute and store per-patch local noise variance maps as auxiliary channels for the SO-band inputs.",
+                "Apply arcsinh transformation to tSZ and CIB maps for dynamic range compression.",
+                "Set DataLoader num_workers=8 to avoid thread oversubscription."
+            ],
+            "sub_task": "Data Preprocessing and Dataset Class Implementation",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Construct a dual-branch U-Net architecture with separate encoders for SO-band and CIB-band inputs.",
+                "Ensure the encoders produce feature maps at multiple spatial resolutions (256, 128, 64, 32).",
+                "Implement gated cross-attention modules operating independently at each resolution level.",
+                "Use sigmoid-gated additive fusion for CIB branch feature injection into the SO branch decoder.",
+                "Concatenate noise variance maps as auxiliary input channels to the SO branch input only."
+            ],
+            "sub_task": "Architecture Implementation (Multi-scale U-Net with Cross-Attention)",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Implement the training loop using AdamW and a one-cycle learning rate scheduler.",
+                "Integrate the composite loss function: L1 reconstruction loss, spectral consistency loss (using utils.powers), and Sobel-filter edge loss.",
+                "Compute spectral consistency loss on CPU and transfer back to GPU, ensuring the computation graph is maintained.",
+                "Print loss weights (lambda_1, lambda_2, lambda_3) at start-up and per-epoch validation loss breakdowns.",
+                "Cap training at 30 epochs or use early stopping with patience=5; print final component-wise losses."
+            ],
+            "sub_task": "Model Training with Composite Loss Function",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Compute RMSE, SSIM, and cross-correlation coefficients against ground truth tSZ maps.",
+                "Perform a null test by running the model on pure noise realizations to quantify hallucination.",
+                "Report the null test hallucination fraction as the RMS of model output on noise normalized by ground truth tSZ RMS.",
+                "Generate a single multi-panel figure containing: (a) ground truth tSZ patch, (b) model reconstruction, (c) residual map, and (d) angular power spectra of ground truth, reconstruction, and residual."
+            ],
+            "sub_task": "Evaluation and Null Testing",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Train ablation models (no-CIB and no-spectral-loss) using identical hyperparameters and random seeds.",
+                "Implement Monte Carlo dropout at inference time (at least 20 passes) to generate pixel-wise uncertainty maps.",
+                "Visualize uncertainty maps alongside mean predictions and ground truth in a single composite figure.",
+                "Print RMSE, SSIM, and cross-correlation metrics for all models in a consolidated table to stdout."
+            ],
+            "sub_task": "Ablation Studies and Uncertainty Quantification",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Synthesize the quantitative results (RMSE, SSIM, spectral consistency) from the previous steps.",
+                "Interpret the impact of CIB auxiliary maps and the spectral loss on the reconstruction of baryonic pressure.",
+                "Discuss the angular scale dependence of reconstruction quality based on ell-dependent cross-correlation results.",
+                "Comment on the physical significance of the null test hallucination fraction relative to signal amplitude.",
+                "Provide a comprehensive summary of the research findings for the final report."
+            ],
+            "sub_task": "Final Results and Interpretation",
+            "sub_task_agent": "researcher"
+        }
+    ]
+}
