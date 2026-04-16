@@ -1,0 +1,70 @@
+{
+    "sub_tasks": [
+        {
+            "bullet_points": [
+                "Compute and save the tSZ spectral response vector using utils.tsz() at all six frequencies, CIB conversion factors using utils.jysr2uk(), and kSZ response using utils.ksz().",
+                "Construct the cILC constraint matrix to enforce a unit response to the tSZ spectral signature while nulling the CIB contribution.",
+                "Construct the Wiener Filter in harmonic space using signal and noise covariance estimates derived from the simulation patches via utils.powers().",
+                "Calculate and save reconstruction performance metrics (MSE, power spectrum residuals) for these linear methods.",
+                "Produce and save diagnostic plots showing reconstructed tSZ maps vs. ground truth and angular power spectra of reconstruction residuals."
+            ],
+            "sub_task": "Baseline Implementation (cILC and Wiener Filter)",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Define the train/validation/test split (70/15/15%) and reserve the test set for final evaluation in Step 5.",
+                "Ensure the top 5% most massive cluster patches (identified in Step 3) are withheld from the training set to prevent data leakage.",
+                "Develop a data loader that handles 6-frequency inputs, proper noise sampling (SO/Planck), and normalization; validate output against ground truth statistics.",
+                "Implement the SR-DAE architecture with gated cross-attention.",
+                "Train the model using a composite loss function: L_L1 + lambda_1 L_spec + lambda_2 L_corr, where L_spec uses utils.powers() to match the mean ground truth power spectrum, and L_corr penalizes cross-correlation between residuals and input frequency maps.",
+                "Save trained model weights and training loss history."
+            ],
+            "sub_task": "Data Pipeline and SR-DAE Training",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Identify the top 5% most massive cluster patches by computing the peak tSZ Compton-y value per patch from tsz.npy and save these indices for reuse.",
+                "Perform \"Leave-One-Out\" testing on these massive cluster patches.",
+                "Conduct noise-level stress tests using the 95th percentile of SO noise realizations (based on RMS noise levels).",
+                "Generate saliency maps using Integrated Gradients (IG) for high-SNR cluster patches and low-SNR field patches.",
+                "Run \"Null Tests\" on pure noise realizations and compare the output distribution to a zero-mean Gaussian.",
+                "Produce and save a multi-panel figure showing saliency maps, null test distributions, and MSE comparisons between standard and OOD patches."
+            ],
+            "sub_task": "OOD Stress Testing and Feature Attribution",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Transition the SR-DAE to a Conditional Diffusion Model (CDM) using pre-trained weights as the backbone.",
+                "Train the CDM to learn p(tSZ | Observed, Noise).",
+                "Generate multiple realizations to calculate pixel-wise variance maps for uncertainty quantification.",
+                "Note: Use peak tSZ signal per patch as a proxy for cluster mass for the Y_SZ-M relation in Step 5, as no external halo catalog exists."
+            ],
+            "sub_task": "Probabilistic Framework (CDM) Transition",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Validate CDM uncertainty calibration using the Probability Integral Transform (PIT).",
+                "Extract the Y_SZ-M relation using peak tSZ signal as a mass proxy.",
+                "Compare scatter and bias of SR-DAE/CDM against linear baselines.",
+                "Compute reconstruction gain (MSE ratio) binned in l in [1000, 5000] using utils.powers().",
+                "Produce a consolidated figure with subplots for: (a) PIT histogram, (b) Y_SZ-M scatter, (c) power spectrum transfer function T(l), and (d) reconstruction gain ratio."
+            ],
+            "sub_task": "Uncertainty Calibration and Scientific Validation",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Explicitly report all numerical values (MSE, power spectrum residuals, Y_SZ-M scatter coefficients, PIT statistics, gain ratios) printed by the engineer.",
+                "Structure the Results section with subsections corresponding to each engineer step.",
+                "Reference all generated plots by name and interpret them in the context of the physical goals (baryonic feedback reconstruction, robustness, and uncertainty calibration).",
+                "Write the full Results section of the report."
+            ],
+            "sub_task": "Results Synthesis and Reporting",
+            "sub_task_agent": "researcher"
+        }
+    ]
+}
