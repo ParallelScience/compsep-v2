@@ -1,0 +1,12 @@
+**Hypothesis: Disentangling Baryonic Feedback via Frequency-Dependent Morphological Priors in a Latent Diffusion Model.**
+
+While the current Conditional Diffusion Model (CDM) successfully recovers high-multipole power, it treats the CIB as a monolithic spatial prior. However, the CIB spectral energy distribution (SED) varies significantly across the 353–857 GHz range, tracing different populations of star-forming galaxies at varying redshifts. 
+
+I hypothesize that the model's current "mean-blurring" or "hallucination" tendencies in high-noise regimes are due to the lack of explicit spectral-spatial conditioning. By replacing the current CIB-conditioning with a **Multi-Band Spectral Attention (MBSA) module**—which processes the CIB maps as a 5-channel spectral cube rather than a flattened spatial prior—the model will learn to distinguish between the "dusty" signatures of high-redshift CIB (which correlate with early-stage halo formation) and the "colder" signatures of local infrared emission. 
+
+Specifically, I propose:
+1. **Spectral-Cube Conditioning:** Instead of concatenating CIB maps, feed them into a 3D-convolutional encoder that extracts features across the frequency dimension, allowing the diffusion model to learn the frequency-dependent correlation between CIB and tSZ (the "tSZ-CIB cross-correlation" physics).
+2. **Physics-Informed Latent Guidance:** Introduce a guidance term during the reverse diffusion process that enforces the *nulling* of the tSZ signal in regions where the CIB spectral slope is inconsistent with the known FLAMINGO tSZ-CIB cross-power spectrum.
+3. **Objective:** This will allow the model to better isolate the tSZ signal from the CIB foregrounds by leveraging the fact that tSZ is frequency-independent (in the non-relativistic limit) while CIB is highly frequency-dependent, effectively using the CIB's own spectral diversity to "subtract" its contribution from the SO LAT bands more accurately than a simple spatial prior.
+
+This approach will test whether explicitly modeling the spectral-spatial hierarchy of the CIB can further reduce the scatter in the $Y_{SZ}-M$ relation and improve the recovery of small-scale baryonic feedback signatures that are currently masked by CIB-induced noise.
