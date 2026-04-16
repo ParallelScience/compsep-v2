@@ -1,0 +1,275 @@
+
+###### PROMPT BEGINS ########
+Human: You are provided with:
+- a description of the data
+- an idea
+- research plan to carry out the idea.
+
+Your task is to provide suggestions on how to improve the plan.
+Take into account and potential feedback (if any).
+If the plan is already good enough, do not give suggestions to improve it. If this is not first iteration, you will also be provided with the previous research plan along with some feedback on it. If this is the case, take into account the feedback provided when designing the new research plan. It is good to have a detailed plan, but not to have an overly complicated plan. If you dont have suggestions, just say that you dont have further suggestions. The idea should remain the same. No need to add code to the research plan, as another agent will write code given the research plan.
+
+Data description:
+# Dataset Description: FLAMINGO Lensed Component-Separation Maps
+
+This dataset consists of flat-sky cut maps derived from full-sky maps of the cosmic microwave background (CMB), thermal and kinetic Sunyaev-Zel'dovich effects (tSZ/kSZ), and the cosmic infrared background (CIB). The sky signal maps originate from the FLAMINGO L1_m9 HYDRO_FIDUCIAL simulation (lightcone0, Jeger rotation) — a large-volume (1 Gpc comoving box) hydrodynamical simulation with self-consistent baryonic physics (radiative cooling, star formation, AGN feedback, diffuse gas flows).
+
+The CMB is a Gaussian realization lensed by the FLAMINGO convergence map (κ) via lenspyx, using Planck-like cosmology (h=0.6736, n_s=0.965, A_s=2.1e-9, seed=42).
+
+## File Inventory (absolute paths, verified)
+
+All files are under `/home/node/data/compsep_data/cut_maps/`.
+
+### Individual component maps — ground truth, 1 arcmin beam
+Shape: **(1523, 256, 256)**, dtype **float64**
+
+- `/home/node/data/compsep_data/cut_maps/lensed_cmb.npy` — Lensed CMB temperature, µK_CMB
+- `/home/node/data/compsep_data/cut_maps/tsz.npy` — tSZ Compton-y parameter, dimensionless
+- `/home/node/data/compsep_data/cut_maps/ksz.npy` — kSZ Doppler-b parameter, dimensionless
+- `/home/node/data/compsep_data/cut_maps/cib_90.npy` — CIB at 90 GHz, Jy/sr (delta-bandpass)
+- `/home/node/data/compsep_data/cut_maps/cib_150.npy` — CIB at 150 GHz, Jy/sr (delta-bandpass)
+- `/home/node/data/compsep_data/cut_maps/cib_217.npy` — CIB at 217 GHz, Jy/sr (bandpass-integrated)
+- `/home/node/data/compsep_data/cut_maps/cib_353.npy` — CIB at 353 GHz, Jy/sr (bandpass-integrated)
+- `/home/node/data/compsep_data/cut_maps/cib_545.npy` — CIB at 545 GHz, Jy/sr (bandpass-integrated)
+- `/home/node/data/compsep_data/cut_maps/cib_857.npy` — CIB at 857 GHz, Jy/sr (bandpass-integrated)
+
+### Stacked (observed) signal maps — frequency-specific beam, no noise
+Shape: **(1523, 256, 256)**, dtype **float64**, units **µK_CMB**
+
+- `/home/node/data/compsep_data/cut_maps/stacked_90.npy` — 90 GHz total signal, beam FWHM 2.2 arcmin (SO LAT)
+- `/home/node/data/compsep_data/cut_maps/stacked_150.npy` — 150 GHz total signal, beam FWHM 1.4 arcmin (SO LAT)
+- `/home/node/data/compsep_data/cut_maps/stacked_217.npy` — 217 GHz total signal, beam FWHM 1.0 arcmin (SO LAT)
+- `/home/node/data/compsep_data/cut_maps/stacked_353.npy` — 353 GHz total signal, beam FWHM 4.5 arcmin (Planck HFI)
+- `/home/node/data/compsep_data/cut_maps/stacked_545.npy` — 545 GHz total signal, beam FWHM 4.72 arcmin (Planck HFI)
+- `/home/node/data/compsep_data/cut_maps/stacked_857.npy` — 857 GHz total signal, beam FWHM 4.42 arcmin (Planck HFI)
+
+The stacked signal is the linear mixture of all components in µK_CMB:
+  signal(freq) = CIB(freq)*jysr2uk(freq) + tSZ*f_tSZ(freq) + kSZ*f_kSZ + lensed_CMB
+then smoothed with the frequency-specific beam. Individual component maps have a 1 arcmin beam.
+
+### Noise maps
+
+**Simons Observatory (SO) LAT noise** — 3000 independent Gaussian realizations
+Shape: **(3000, 256, 256)**, dtype **float64**, units **µK_CMB**
+
+- `/home/node/data/compsep_data/cut_maps/so_noise/90.npy`
+- `/home/node/data/compsep_data/cut_maps/so_noise/150.npy`
+- `/home/node/data/compsep_data/cut_maps/so_noise/217.npy`
+
+SO noise is drawn from the SO LAT v3.1 temperature noise power spectrum (mode 2, elevation 50°, f_sky=0.4). 90 and 150 GHz are correlated (Cholesky decomposition); 217 GHz is independent. When sampling SO noise, the noise index does NOT need to match the sky patch index.
+
+**Planck FFP10 noise** — 100 MC realizations per high-frequency channel
+Shape: **(1523, 256, 256)**, dtype **float64**
+Filename pattern: `planck_noise_{freq}_{i}.npy`, freq ∈ {353, 545, 857}, i ∈ {0, …, 99}
+
+- `/home/node/data/compsep_data/cut_maps/planck_noise/planck_noise_353_{0..99}.npy` — units: K_CMB → multiply by 1e6 to get µK_CMB
+- `/home/node/data/compsep_data/cut_maps/planck_noise/planck_noise_545_{0..99}.npy` — units: MJy/sr → multiply by 1e6 * jysr2uk(545) to get µK_CMB
+- `/home/node/data/compsep_data/cut_maps/planck_noise/planck_noise_857_{0..99}.npy` — units: MJy/sr → multiply by 1e6 * jysr2uk(857) to get µK_CMB
+
+For Planck noise, the patch index MUST match the sky patch index.
+
+## Spectral Response and Utility Functions
+
+A `utils.py` module is available at `/home/node/data/compsep_data/utils.py`. **Always import it using the absolute path or by adding its directory to sys.path:**
+
+```python
+import sys
+sys.path.insert(0, '/home/node/data/compsep_data')
+import utils
+```
+
+Key functions in utils.py:
+- `utils.tsz(freq_ghz)` — tSZ spectral response in µK_CMB per Compton-y unit
+- `utils.ksz(freq_ghz)` — kSZ spectral response in µK_CMB (= -T_CMB_µK, frequency-independent)
+- `utils.jysr2uk(freq_ghz)` — converts Jy/sr to µK_CMB for CIB at given frequency
+- `utils.powers(a, b, ps=10, ell_n=199, window_alpha=None)` — flat-sky angular auto/cross power spectrum
+- `utils.get_patch_centers(gal_cut, step_size)` — returns list of (lon, lat) patch centers
+
+## Patch Geometry
+
+- 1523 patches, 5°×5°, 256×256 pixels, ≈1.17 arcmin/pixel
+- Full-sky tessellation at 5° step spacing (no galactic cut)
+- Gnomonic (flat-sky) projection, bilinear interpolation from HEALPix nside=8192
+
+## Loading Data (correct absolute paths)
+
+```python
+import sys
+sys.path.insert(0, '/home/node/data/compsep_data')
+import utils
+import numpy as np
+
+BASE = '/home/node/data/compsep_data/cut_maps'
+
+rng = np.random.default_rng(seed=42)
+n_patch = 1523
+n_planck = 100
+n_so = 3000
+
+i_patch = rng.integers(n_patch)   # sky patch index
+i_planck = rng.integers(n_planck) # Planck MC realization index
+i_so = rng.integers(n_so)         # SO noise index (does not need to match i_patch)
+
+# Load observed signal + noise at each frequency
+frequencies = [90, 150, 217, 353, 545, 857]
+patches = {}
+for freq in frequencies:
+    signal = np.load(f'{BASE}/stacked_{freq}.npy')[i_patch]  # µK_CMB
+    if freq <= 217:  # SO noise
+        noise = np.load(f'{BASE}/so_noise/{freq}.npy')[i_so]  # µK_CMB
+    else:  # Planck noise
+        raw = np.load(f'{BASE}/planck_noise/planck_noise_{freq}_{i_planck}.npy')[i_patch]
+        if freq == 353:
+            noise = raw * 1e6                        # K_CMB -> µK_CMB
+        else:
+            noise = raw * 1e6 * utils.jysr2uk(freq) # MJy/sr -> µK_CMB
+    patches[freq] = signal + noise  # µK_CMB
+
+# Load ground truth components
+cmb   = np.load(f'{BASE}/lensed_cmb.npy')[i_patch]  # µK_CMB
+tsz   = np.load(f'{BASE}/tsz.npy')[i_patch]          # Compton-y (dimensionless)
+ksz   = np.load(f'{BASE}/ksz.npy')[i_patch]          # Doppler-b (dimensionless)
+cib90 = np.load(f'{BASE}/cib_90.npy')[i_patch]       # Jy/sr
+```
+
+## CMB Simulation Cosmology
+
+CLASS parameters used:
+- A_s = 2.1e-9, n_s = 0.965, h = 0.6736
+- ω_b = 0.02237, ω_cdm = 0.12, τ_reio = 0.0544, Y_He = 0.2454
+
+## Hardware and Environment
+
+- Python: `/opt/denario-venv/bin/python`
+- *64 vCPUs* (AMD Ryzen Threadripper PRO 9995WX), *128 GB RAM*
+- *NVIDIA RTX PRO 6000 Blackwell Edition, 96 GB VRAM*, CUDA 13.0
+- PyTorch GPU: use `device='cuda'`
+- Multiprocessing: limit to ~8–16 workers to avoid oversubscription
+- Set `OMP_NUM_THREADS` when using NumPy/SciPy with multiprocessing
+- Load data patch-by-patch or in small batches; avoid loading all 1523 patches for all frequencies simultaneously (total data volume is large)
+
+
+Idea:
+**Title**: Spectral-Spatial Super-Resolution Denoising for Baryonic Pressure Mapping
+
+**Description**: This objective implements a Super-Resolution Denoising Autoencoder (SR-DAE) to reconstruct 1-arcmin resolution tSZ Compton-y maps from SO LAT-band observations (90, 150, 217 GHz), utilizing high-frequency CIB maps (353–857 GHz) as auxiliary features to guide the recovery of small-scale gas pressure fluctuations. The architecture employs a multi-scale U-Net with gated cross-attention, enabling the model to learn the spatial correlation between CIB-traced star-forming regions and ionized gas flows without assuming deterministic coupling. To ensure physical validity, the training objective minimizes a composite loss function: a pixel-wise L1-reconstruction loss for the tSZ ground truth and a spectral consistency term calculated via `utils.powers` that penalizes deviations from the FLAMINGO-simulated tSZ power spectrum. By conditioning on per-patch SO and Planck noise realizations, the SR-DAE effectively disentangles the non-Gaussian tSZ signal from the Gaussian CMB background and instrument noise. This approach specifically targets the 1–5 arcmin scale, where baryonic feedback signatures are most prominent, while preventing the hallucination of features by constraining the latent space representation to the known physical power distribution of the simulation.
+
+Research plan:
+1. **Pre-processing via Constrained ILC (cILC)**:
+    - Implement a cILC operator to null the primary CMB signal from the SO frequency maps (90, 150, 217 GHz). Use the known CMB spectral response (frequency-independent in $\mu K_{CMB}$) as the constraint.
+    - Generate "ILC-residual" maps for these three channels. This step reduces the dynamic range of the input data by removing the dominant Gaussian CMB component, allowing the network to focus on the non-linear tSZ and CIB signals.
+
+2. **Feature Engineering (Spectral Differences)**:
+    - Construct spectral difference maps from the ILC-residual channels (e.g., $150-90$ GHz, $217-150$ GHz). These maps are designed to highlight the tSZ spectral signature ($f_{tSZ}$) while further suppressing frequency-independent noise and residual foregrounds.
+    - Concatenate these difference maps with the high-frequency CIB maps (353–857 GHz) to form the input tensor for the SR-DAE.
+
+3. **Target Normalization and Masking**:
+    - Standardize the tSZ ground truth maps to unit variance to ensure stable gradient flow.
+    - Generate a binary "significance mask" based on a threshold of the ground truth tSZ (e.g., $y > 10^{-7}$). This mask identifies pixels containing physically significant baryonic structures (clusters and filaments).
+
+4. **Focal Loss Implementation**:
+    - Replace the global L1/MSE loss with a Focal Loss function. Apply a weighting factor of $10^3–10^4$ to pixels within the significance mask.
+    - This objective forces the network to prioritize the reconstruction of high-intensity baryonic features over the suppression of background noise in empty regions, preventing the "model collapse" observed in previous iterations.
+
+5. **Refined Architecture and Training**:
+    - Maintain the multi-scale U-Net with gated cross-attention, ensuring the architecture accepts the pre-processed spectral difference maps and CIB auxiliary features.
+    - Use the AdamW optimizer with a one-cycle learning rate scheduler.
+    - Implement mixed-precision training (FP16) on the RTX PRO 6000, ensuring `OMP_NUM_THREADS` is set to prevent oversubscription during data loading.
+
+6. **Sensitivity Threshold Analysis (Signal-Injection)**:
+    - Inject GNFW cluster profiles of varying masses and peak-y values into the noise-dominated input maps.
+    - Quantify the model's recovery accuracy by measuring the integrated $Y$ and radial profile fidelity as a function of the injected signal strength.
+    - Determine the minimum mass/peak-y threshold for reliable reconstruction to establish the physical limits of the model.
+
+7. **Physical Consistency and Power Spectrum Constraints**:
+    - Integrate the differentiable Pseudo-$C_\ell$ estimator into the loss function to penalize deviations from the FLAMINGO-simulated tSZ power spectrum at $\ell > 1000$.
+    - Apply the wavelet-based loss to ensure structural fidelity specifically in the 1–5 arcmin range, where baryonic feedback signatures are most prominent.
+
+8. **Performance Assessment**:
+    - Evaluate the model using the cross-correlation coefficient $r_\ell$ to verify phase coherence between the reconstructed and ground truth maps.
+    - Perform a "Bias-Variance" check on the residuals as a function of ground truth tSZ intensity to identify any systematic underestimation in high-density regions.
+    - Quantify reconstruction quality across different cluster mass bins to validate the model's utility for baryonic pressure mapping.
+
+Previous research plan:
+1. **Evaluation Pipeline and Coordinate Validation**:
+    - Verify the `utils.powers` estimator by computing the power spectrum of a known Gaussian random field and comparing it against the theoretical input spectrum to ensure correct pixel-to-physical mapping (1.17 arcmin/pixel).
+    - Perform a coordinate alignment check: compute the cross-correlation of the ground truth tSZ map with a 90-degree rotated version of itself to ensure zero correlation, confirming no systematic spatial offsets or phase-incoherence.
+    - Implement a diagnostic check to compare the mean and variance of the ground truth vs. model output to identify potential mean-subtraction errors.
+
+2. **Data Pipeline and Preprocessing**:
+    - Implement a `torch.utils.data.Dataset` that enforces index matching for Planck noise (`i_patch == i_planck`) while sampling SO noise independently (`i_so` random) to prevent the model from memorizing specific noise patterns.
+    - Apply channel-wise robust scaling (median and interquartile range) to all input maps, particularly CIB channels, to prevent outliers from dominating the input features.
+    - Apply a soft-clipping transformation to the tSZ ground truth to manage high dynamic range while preserving filamentary signal.
+
+3. **Refined Architecture with Interpretability**:
+    - Utilize the multi-scale U-Net with gated cross-attention, injecting CIB features at the bottleneck and skip connections.
+    - Integrate an Integrated Gradients module to generate saliency maps, using a "neutral" baseline (zeros or mean background). Perform this analysis across both high-mass clusters and low-mass filaments to determine if the CIB-attention acts as a cluster-finder or a diffuse gas reconstructor.
+    - Normalize saliency maps by input variance to ensure gradients reflect informative features rather than numerical magnitude.
+
+4. **Differentiable Multi-Resolution Wavelet Loss**:
+    - Implement a differentiable wavelet decomposition (using a custom filter bank or `pytorch-wavelets`) to penalize deviations specifically in the 1–5 arcmin scale range.
+    - Implement a Differentiable Pseudo-$C_\ell$ estimator that incorporates the apodization window to compute the power spectrum loss for $\ell > 1000$.
+
+5. **Physical Calibration and Flux Constraints**:
+    - Define a composite loss: $L = \lambda_1 L_{L1} + \lambda_2 L_{wavelet} + \lambda_3 L_{pseudo-Cl} + \lambda_4 L_{flux}$.
+    - Implement $L_{flux}$ as a combination of global sum conservation and a "local" flux constraint using a Gaussian-weighted sum to preserve pressure in the vicinity of individual clusters.
+    - Anneal the weight $\lambda_4$ during training, starting low to allow structural convergence before enforcing strict flux conservation.
+
+6. **Signal-Injection Testing**:
+    - Replace pure noise null tests with a Signal-Injection Test: inject a known GNFW cluster profile into pure noise maps.
+    - Measure the recovery accuracy of the integrated $Y$ and the radial profile of the injected cluster to quantify the model's ability to reconstruct physical structures in noise-dominated regimes.
+
+7. **Training and Optimization**:
+    - Use the AdamW optimizer with a one-cycle learning rate scheduler.
+    - Select a validation set of 150 patches that spans a representative range of FLAMINGO density environments (clusters vs. filaments).
+    - Use mixed-precision training (FP16) on the RTX PRO 6000, ensuring `OMP_NUM_THREADS` is set to avoid oversubscription.
+
+8. **Performance Assessment**:
+    - Evaluate the model using the cross-correlation coefficient $r_\ell$ as a function of multipole $\ell$ to ensure phase coherence.
+    - Perform a "Bias-Variance" check: calculate the mean of the residuals (pred - truth) as a function of the ground truth tSZ intensity to identify systematic underestimation in high-density regions or overestimation in low-density regions.
+    - Quantify reconstruction quality via the recovery of integrated $Y$ across different cluster mass bins.
+
+Feedback on previous research plan:
+The current analysis has failed due to a fundamental mismatch between the loss landscape and the physical sparsity of the tSZ signal. The "model collapse" to a near-zero constant is a classic symptom of optimizing a global L1/MSE loss on a signal where the information density is concentrated in <0.1% of the pixels. Your diagnostic work (Signal-Injection and $r_\ell$ analysis) is excellent and correctly identifies that the model is effectively "blind" to the signal.
+
+**Critical Weaknesses & Actionable Feedback:**
+
+1. **Abandon Global L1/MSE Loss:** You are currently penalizing the model for failing to predict "empty space" correctly. This is a waste of gradient capacity. 
+   - **Action:** Implement a **Masked Loss** or **Focal Loss**. Create a binary mask based on a threshold of the ground truth tSZ (e.g., $y > 10^{-7}$). Compute the loss only on pixels where the signal is physically significant, or weight these pixels by a factor of $10^3–10^4$. This forces the network to prioritize cluster/filament reconstruction over background suppression.
+
+2. **Pre-processing vs. End-to-End:** You are asking the network to perform "blind" component separation on signals with 22 orders of magnitude difference in variance. This is computationally inefficient and prone to the observed collapse.
+   - **Action:** Perform a **Constrained Internal Linear Combination (cILC)** as a pre-processing step to null the primary CMB. The CMB is Gaussian and its spectral response is known; there is no scientific benefit to forcing a neural network to "re-learn" how to subtract it. By feeding the network the ILC-residual maps, you reduce the dynamic range by orders of magnitude, allowing the U-Net to focus on the non-linear tSZ/CIB/noise disentanglement.
+
+3. **Target Normalization is Mandatory:** Your report correctly identifies that the tSZ maps were not standardized. 
+   - **Action:** Standardize the tSZ maps to unit variance. When combined with the weighted loss (Point 1), this will ensure that the gradients are informative.
+
+4. **Re-evaluating the "Gated Cross-Attention":** Your saliency maps suggest the gates are closing to suppress noise. This is a rational response to a high-noise, low-signal input.
+   - **Action:** Instead of feeding raw frequency maps, feed the network **spectral difference maps** (e.g., $150-90$ GHz, $217-150$ GHz). These differences are naturally sensitive to the tSZ spectral signature ($f_{tSZ}$) and suppress the primary CMB (which is frequency-independent in $\mu K_{CMB}$). This provides the network with "features" that are physically correlated with the target, rather than forcing it to perform the subtraction internally.
+
+5. **Signal-Injection Test:** Your current test is a "null" test that confirms failure. 
+   - **Action:** Once the loss is updated, use the Signal-Injection test to perform a **Sensitivity Threshold Analysis**. Determine the minimum mass/peak-y value the model can recover. This is more scientifically valuable than a binary "it failed" result and will provide the necessary material for a paper regarding the limits of deep learning in baryonic pressure mapping.
+
+**Summary for Next Iteration:**
+Stop trying to train the model to "see" the signal in the raw, noise-dominated input. Pre-process to remove the CMB (cILC), provide spectral differences to highlight the tSZ, and use a weighted/focal loss to force the network to focus on the high-intensity structures. This is the minimum viable path to a robust, physically meaningful model.
+
+
+Respond in this format:
+
+\\begin{SUGGESTIONS}
+<SUGGESTIONS>
+\\end{SUGGESTIONS}
+
+In <SUGGESTIONS> put the suggestions to improve the plan.
+
+###### PROMPT ENDS ########
+
+\begin{SUGGESTIONS}
+The updated research plan is highly robust and directly addresses the previous failure modes. I have only two minor suggestions to further strengthen the implementation:
+
+1. **cILC Stability and Leakage:** When implementing the cILC in Step 1, ensure that the weights are calculated using a cross-patch covariance matrix to avoid overfitting to specific noise realizations in a single patch. Additionally, since the cILC can introduce "leakage" of the CIB or kSZ into the residual maps, consider adding a small "regularization" term to the cILC weights to minimize the variance of the residual in regions where the tSZ signal is known to be negligible.
+
+2. **Data Augmentation for Robustness:** Given that you are now using a Focal Loss and significance masks, the model might become overly sensitive to the specific morphology of the FLAMINGO simulation. To improve generalization, consider adding simple geometric augmentations (random 90-degree rotations and flips) during training. This is computationally inexpensive and will help the network learn rotationally invariant features of the baryonic pressure profiles, which is essential for reliable cluster reconstruction.
+
+The plan is otherwise excellent and ready for execution.
+\end{SUGGESTIONS}
+
