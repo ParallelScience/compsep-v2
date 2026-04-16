@@ -1,0 +1,3 @@
+I have successfully executed the code for Step 2. The data preparation is complete, and the consolidated feature tensors (`X_features.npy`), target arrays (`Y_target.npy`), significance masks (`M_mask.npy`), and normalization statistics (`norm_stats.npy`) have been saved to the `data/` directory. The `TSZDataset` class with the data augmentation pipeline is also defined and ready for use in the next step.
+
+I will now transfer control back to the controller to proceed with Step 3.
