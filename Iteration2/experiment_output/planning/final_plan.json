@@ -2,53 +2,84 @@
     "sub_tasks": [
         {
             "bullet_points": [
-                "Compute cILC weights in harmonic (Fourier) space on the flat-sky patches to account for spectrally structured noise.",
-                "Use the known tSZ spectral response vector from utils.tsz and the CMB response vector (unity at all SO frequencies) to enforce the CMB-nulling constraint.",
-                "Save the computed per-patch cILC weights, noise covariance matrices, and the resulting cILC y-maps for use in subsequent steps."
+                "Implement a data loader for patch-based loading of signal and noise maps.",
+                "Compute empirical noise covariance matrices for SO LAT bands (90, 150, 217 GHz) in harmonic (Fourier) space.",
+                "Construct cILC weights in harmonic space using spectral response vectors from utils.tsz and utils.ksz.",
+                "Verify the CMB-nulling constraint analytically and save the weights and covariance matrices."
             ],
             "sub_task": "Data Pre-processing and cILC Construction",
             "sub_task_agent": "engineer"
         },
         {
             "bullet_points": [
-                "Construct spectral difference maps (e.g., 150-90 GHz, 217-150 GHz) and apply robust scaling to CIB auxiliary channels (353–857 GHz).",
-                "Standardize tSZ ground truth maps to unit variance and generate binary significance masks (y > 10^-7).",
-                "Implement a data augmentation pipeline (rotations and flips) and save a consolidated dataset of input feature tensors and target arrays ready for the DataLoader."
+                "Convert CIB auxiliary channels (353–857 GHz) from Jy/sr to µK_CMB using utils.jysr2uk.",
+                "Account for beam smoothing differences between Planck-band (4.42–4.72 arcmin) and SO-band channels when constructing spectral difference maps.",
+                "Normalize spectral difference maps and CIB channels using local variance estimates.",
+                "Apply robust scaling to CIB maps and save the processed feature tensors."
             ],
-            "sub_task": "Consolidated Feature Engineering and Data Preparation",
+            "sub_task": "Feature Engineering and Normalization",
             "sub_task_agent": "engineer"
         },
         {
             "bullet_points": [
-                "Define a multi-scale U-Net with a gated cross-attention module (SO-band queries, Planck CIB keys/values).",
-                "Implement a composite loss function including pixel-wise L1-reconstruction, a soft-regularized differentiable Pseudo-Cl penalty (for l > 1000), and a wavelet-based loss (3 scales, 1–5 arcmin range).",
-                "Configure the training loop with Focal Loss, gradient clipping, and AdamW; ensure the spectral consistency term is evaluated only on a held-out validation subset to prevent overfitting."
+                "Split the 1523 patches into explicit train (70%), validation (15%), and test (15%) sets.",
+                "Compute normalization statistics (mean, variance) exclusively from the training set.",
+                "Standardize tSZ ground truth maps and generate binary significance masks (y > 10^-7).",
+                "Implement data augmentation (rotations/flips) for the training set and save processed targets/masks."
             ],
-            "sub_task": "Architecture and Training with Physical Constraints",
+            "sub_task": "Target Normalization and Masking",
             "sub_task_agent": "engineer"
         },
         {
             "bullet_points": [
-                "Train a control model (no CIB features) using the exact same architecture, optimizer, and schedule as the full model for a clean comparison.",
-                "Perform a GNFW injection test (mass range 10^13–10^15 M_sun) to determine the minimum detectable peak-y value as a function of noise level.",
-                "Compute and print performance metrics (cross-correlation coefficient r_l) and GNFW thresholds numerically to the console."
+                "Define the multi-scale U-Net architecture with gated cross-attention.",
+                "Implement the composite loss function (pixel-wise L1-reconstruction and spectral consistency via utils.powers).",
+                "Configure the training loop with Focal Loss, gradient clipping, and AdamW optimizer.",
+                "Save the model architecture and loss definitions for the training step."
+            ],
+            "sub_task": "Architecture and Loss Definition",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Execute the training process on the GPU using the defined architecture and loss.",
+                "Monitor performance on both significant and null patches.",
+                "Save the model checkpoint with the best validation loss for subsequent fine-tuning."
+            ],
+            "sub_task": "Model Training and Monitoring",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Implement a differentiable Pseudo-Cl estimator operating on 2D FFTs of 256x256 patches, binning multipoles into annular rings.",
+                "Integrate a wavelet-based loss targeting angular scales between 1 and 5 arcmin (3–4 dyadic scales).",
+                "Perform a final fine-tuning pass on the best-checkpoint model using these physical constraints."
+            ],
+            "sub_task": "Physical Consistency and Power Spectrum Constraints",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Train a control model without CIB features using the same train/validation/test split and random seeds as Step 5.",
+                "Inject GNFW cluster profiles (log M_500 from 13.5 to 15.0) into noise-dominated inputs to determine the reconstruction threshold.",
+                "Compute performance metrics (r_ell) for both models."
             ],
             "sub_task": "Sensitivity and Ablation Analysis",
             "sub_task_agent": "engineer"
         },
         {
             "bullet_points": [
-                "Generate a single multi-panel figure containing: (a) side-by-side maps (ground truth, full-model, control-model), (b) r_l vs multipole, (c) residual bias vs tSZ intensity, and (d) reconstructed vs ground-truth power spectra.",
-                "Save the figure and all diagnostic summary statistics to the workspace."
+                "Generate a single multi-panel figure: (a) ground-truth vs. reconstructed tSZ maps, (b) r_ell for full vs. ablated model, (c) residual bias vs. tSZ intensity, and (d) reconstructed vs. ground-truth power spectra.",
+                "Save all diagnostic plots and summary statistics."
             ],
             "sub_task": "Performance Assessment and Visualization",
             "sub_task_agent": "engineer"
         },
         {
             "bullet_points": [
-                "Synthesize all numerical results (r_ell values, bias statistics, GNFW thresholds, power spectrum residuals) printed in previous steps.",
-                "Structure the Results section with subsections: cILC pre-processing performance, SR-DAE reconstruction quality, ablation analysis, GNFW injection test results, and power spectrum fidelity assessment.",
-                "Discuss the physical validity of the reconstructed maps and the impact of CIB auxiliary features on baryonic pressure mapping."
+                "Synthesize quantitative results (r_ell at specific bins, bias percentages, minimum detectable cluster mass, performance gain from CIB).",
+                "Interpret the impact of CIB features and discuss physical validity in the context of FLAMINGO.",
+                "Write the full Results section with subsections: cILC baseline, SR-DAE reconstruction, ablation, and cluster detection threshold."
             ],
             "sub_task": "Results Interpretation and Reporting",
             "sub_task_agent": "researcher"

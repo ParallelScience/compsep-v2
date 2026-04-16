@@ -8,117 +8,105 @@ import numpy as np
 import sys
 sys.path.insert(0, '/home/node/data/compsep_data')
 import utils
-def compute_cilc():
-    BASE = '/home/node/data/compsep_data/cut_maps'
-    freqs = [90, 150, 217]
-    n_patch = 1523
-    n_so = 3000
-    batch_size = 100
-    print('Loading SO noise maps...')
-    so_noise = {f: np.load(BASE + '/so_noise/' + str(f) + '.npy') for f in freqs}
-    print('Computing noise covariance matrix N(k)...')
-    N_k = np.zeros((3, 3, 256, 129), dtype=np.complex128)
-    for i in range(0, n_so, batch_size):
-        n_batch = np.array([np.fft.rfft2(so_noise[f][i:i+batch_size]) for f in freqs])
-        N_k += np.einsum('ibxy, jbxy -> ijxy', n_batch, n_batch.conj())
-    N_k /= n_so
-    print('Loading signal maps and adding noise...')
-    rng = np.random.default_rng(seed=42)
-    so_indices = rng.integers(0, n_so, size=n_patch)
-    stacked = {f: np.load(BASE + '/stacked_' + str(f) + '.npy') for f in freqs}
-    data_k = np.zeros((n_patch, 3, 256, 129), dtype=np.complex128)
-    for p in range(n_patch):
-        for idx_f, f in enumerate(freqs):
-            signal = stacked[f][p]
-            noise = so_noise[f][so_indices[p]]
-            data_k[p, idx_f] = np.fft.rfft2(signal + noise)
-    print('Computing global data covariance matrix C_global(k)...')
-    C_global = np.zeros((3, 3, 256, 129), dtype=np.complex128)
-    for i in range(0, n_patch, batch_size):
-        d_batch = data_k[i:i+batch_size]
-        C_global += np.einsum('bixy, bjxy -> ijxy', d_batch, d_batch.conj())
-    C_global /= n_patch
-    print('Setting up cILC constraints...')
-    A = np.zeros((3, 2))
-    A[0, 0] = utils.tsz(90)
-    A[1, 0] = utils.tsz(150)
-    A[2, 0] = utils.tsz(217)
-    A[:, 1] = 1.0
-    print('Computing per-patch cILC weights and y-maps...')
-    cilc_weights = np.zeros((n_patch, 3, 256, 129), dtype=np.complex128)
-    cilc_y_maps = np.zeros((n_patch, 256, 256), dtype=np.float64)
-    A_T = A.T
-    e1 = np.array([[1.0], [0.0]])
-    for i in range(0, n_patch, batch_size):
-        d_batch = data_k[i:i+batch_size]
-        b_size = d_batch.shape[0]
-        C_p = np.einsum('bixy, bjxy -> bijxy', d_batch, d_batch.conj())
-        C_p += C_global[None, ...] + N_k[None, ...]
-        C_p_reshaped = C_p.transpose(0, 3, 4, 1, 2).reshape(-1, 3, 3)
-        C_inv = np.linalg.inv(C_p_reshaped)
-        C_inv_A = np.matmul(C_inv, A)
-        A_T_C_inv_A = np.matmul(A_T, C_inv_A)
-        inv_term = np.linalg.inv(A_T_C_inv_A)
-        right_term = np.matmul(inv_term, e1)
-        W = np.matmul(C_inv_A, right_term)
-        W = W[..., 0]
-        W_batch = W.reshape(b_size, 256, 129, 3).transpose(0, 3, 1, 2)
-        cilc_weights[i:i+batch_size] = W_batch
-        y_k_batch = np.sum(W_batch.conj() * d_batch, axis=1)
-        y_map_batch = np.fft.irfft2(y_k_batch, s=(256, 256))
-        cilc_y_maps[i:i+batch_size] = y_map_batch
-    print('Saving results...')
-    np.save('data/cilc_weights.npy', cilc_weights)
-    np.save('data/noise_cov.npy', N_k)
-    np.save('data/cilc_y_maps.npy', cilc_y_maps)
-    print('cILC computation complete.')
-    print('Saved cilc_weights.npy: shape ' + str(cilc_weights.shape))
-    print('Saved noise_cov.npy: shape ' + str(N_k.shape))
-    print('Saved cilc_y_maps.npy: shape ' + str(cilc_y_maps.shape))
-    print('cILC y-maps stats - Mean: ' + str(np.mean(cilc_y_maps)) + ', Std: ' + str(np.std(cilc_y_maps)))
-    print('cILC y-maps stats - Min: ' + str(np.min(cilc_y_maps)) + ', Max: ' + str(np.max(cilc_y_maps)))
-    print('\nLoading ground truth tSZ maps for evaluation...')
-    tsz_gt = np.load(BASE + '/tsz.npy')
-    y_mean = np.mean(cilc_y_maps)
-    t_mean = np.mean(tsz_gt)
-    y_std = np.std(cilc_y_maps)
-    t_std = np.std(tsz_gt)
-    cov = np.mean((cilc_y_maps - y_mean) * (tsz_gt - t_mean))
-    corr = cov / (y_std * t_std)
-    print('Global pixel-wise Pearson correlation between cILC y-maps and ground truth tSZ: ' + str(corr))
-    corrs = []
-    for p in range(n_patch):
-        c = np.corrcoef(cilc_y_maps[p].flatten(), tsz_gt[p].flatten())[0, 1]
-        corrs.append(c)
-    corrs = np.array(corrs)
-    print('Per-patch Pearson correlation stats - Mean: ' + str(np.mean(corrs)) + ', Std: ' + str(np.std(corrs)) + ', Min: ' + str(np.min(corrs)) + ', Max: ' + str(np.max(corrs)))
-    rmse = np.sqrt(np.mean((cilc_y_maps - tsz_gt)**2))
-    print('Global RMSE between cILC y-maps and ground truth tSZ: ' + str(rmse))
-    print('Ground truth tSZ stats - Mean: ' + str(np.mean(tsz_gt)) + ', Std: ' + str(np.std(tsz_gt)))
-    print('Ground truth tSZ stats - Min: ' + str(np.min(tsz_gt)) + ', Max: ' + str(np.max(tsz_gt)))
-    print('\nComputing average power spectra...')
-    ell_n = 199
-    ps_y = np.zeros(ell_n)
-    ps_tsz = np.zeros(ell_n)
-    ps_cross = np.zeros(ell_n)
-    for p in range(n_patch):
-        ell, py = utils.powers(cilc_y_maps[p], cilc_y_maps[p])
-        _, pt = utils.powers(tsz_gt[p], tsz_gt[p])
-        _, px = utils.powers(cilc_y_maps[p], tsz_gt[p])
-        ps_y += py
-        ps_tsz += pt
-        ps_cross += px
-    ps_y /= n_patch
-    ps_tsz /= n_patch
-    ps_cross /= n_patch
-    r_ell = ps_cross / np.sqrt(ps_y * ps_tsz)
-    print('Scale-dependent cross-correlation r_ell (binned):')
-    bin_size = len(ell) // 10
-    for i in range(10):
-        start = i * bin_size
-        end = (i + 1) * bin_size if i < 9 else len(ell)
-        ell_mean = np.mean(ell[start:end])
-        r_ell_mean = np.mean(r_ell[start:end])
-        print('  ell ~ ' + str(ell_mean) + ': r_ell = ' + str(r_ell_mean))
+class DataLoader:
+    def __init__(self, base_dir='/home/node/data/compsep_data/cut_maps'):
+        self.base_dir = base_dir
+        self.frequencies = [90, 150, 217, 353, 545, 857]
+    def load_signal(self, freq, i_patch):
+        return np.load(self.base_dir + '/stacked_' + str(freq) + '.npy')[i_patch]
+    def load_so_noise(self, freq, i_so):
+        return np.load(self.base_dir + '/so_noise/' + str(freq) + '.npy')[i_so]
+    def load_planck_noise(self, freq, i_patch, i_planck):
+        raw = np.load(self.base_dir + '/planck_noise/planck_noise_' + str(freq) + '_' + str(i_planck) + '.npy')[i_patch]
+        if freq == 353:
+            return raw * 1e6
+        else:
+            return raw * 1e6 * utils.jysr2uk(freq)
+    def load_observed(self, i_patch, i_so, i_planck):
+        patches = {}
+        for freq in self.frequencies:
+            signal = self.load_signal(freq, i_patch)
+            if freq <= 217:
+                noise = self.load_so_noise(freq, i_so)
+            else:
+                noise = self.load_planck_noise(freq, i_patch, i_planck)
+            patches[freq] = signal + noise
+        return patches
+    def load_ground_truth(self, i_patch):
+        cmb = np.load(self.base_dir + '/lensed_cmb.npy')[i_patch]
+        tsz = np.load(self.base_dir + '/tsz.npy')[i_patch]
+        ksz = np.load(self.base_dir + '/ksz.npy')[i_patch]
+        cib90 = np.load(self.base_dir + '/cib_90.npy')[i_patch]
+        cib150 = np.load(self.base_dir + '/cib_150.npy')[i_patch]
+        cib217 = np.load(self.base_dir + '/cib_217.npy')[i_patch]
+        cib353 = np.load(self.base_dir + '/cib_353.npy')[i_patch]
+        cib545 = np.load(self.base_dir + '/cib_545.npy')[i_patch]
+        cib857 = np.load(self.base_dir + '/cib_857.npy')[i_patch]
+        return {'cmb': cmb, 'tsz': tsz, 'ksz': ksz, 'cib_90': cib90, 'cib_150': cib150, 'cib_217': cib217, 'cib_353': cib353, 'cib_545': cib545, 'cib_857': cib857}
+def apply_cilc(patches_dict, W):
+    fft_n = np.stack([np.fft.fft2(patches_dict[90], norm='ortho'), np.fft.fft2(patches_dict[150], norm='ortho'), np.fft.fft2(patches_dict[217], norm='ortho')], axis=-1)
+    cilc_fft = np.sum(W * fft_n, axis=-1)
+    return np.real(np.fft.ifft2(cilc_fft, norm='ortho'))
 if __name__ == '__main__':
-    compute_cilc()
+    print('Initializing DataLoader...')
+    loader = DataLoader()
+    print('Computing empirical noise covariance matrices for SO LAT bands...')
+    base_dir = '/home/node/data/compsep_data/cut_maps'
+    freqs = [90, 150, 217]
+    noise_maps = {}
+    for f in freqs:
+        noise_maps[f] = np.load(base_dir + '/so_noise/' + str(f) + '.npy')
+    fft_maps = {}
+    for f in freqs:
+        fft_maps[f] = np.fft.fft2(noise_maps[f], norm='ortho')
+    cov = np.zeros((256, 256, 3, 3), dtype=np.float64)
+    for i, f1 in enumerate(freqs):
+        for j, f2 in enumerate(freqs):
+            cross = np.mean(fft_maps[f1] * np.conj(fft_maps[f2]), axis=0)
+            cov[:, :, i, j] = np.real(cross)
+    print('Covariance matrix computed. Shape: ' + str(cov.shape))
+    print('  Max variance 90GHz: ' + str(np.max(cov[:,:,0,0])))
+    print('  Max variance 150GHz: ' + str(np.max(cov[:,:,1,1])))
+    print('  Max variance 217GHz: ' + str(np.max(cov[:,:,2,2])))
+    print('\nConstructing cILC weights...')
+    a_tsz = np.array([utils.tsz(f) for f in freqs])
+    a_ksz = np.array([utils.ksz(f) for f in freqs])
+    print('  tSZ spectral response: ' + str(a_tsz))
+    print('  kSZ spectral response: ' + str(a_ksz))
+    A = np.column_stack((a_tsz, a_ksz))
+    e = np.array([1.0, 0.0])
+    trace_cov = np.trace(cov, axis1=2, axis2=3)
+    reg = np.zeros_like(cov)
+    reg[:, :, 0, 0] = trace_cov * 1e-4
+    reg[:, :, 1, 1] = trace_cov * 1e-4
+    reg[:, :, 2, 2] = trace_cov * 1e-4
+    cov_reg = cov + reg
+    inv_cov = np.linalg.inv(cov_reg)
+    inv_cov_A = np.einsum('...ij,jk->...ik', inv_cov, A)
+    At_inv_cov_A = np.einsum('ji,...jk->...ik', A, inv_cov_A)
+    inv_At_inv_cov_A = np.linalg.inv(At_inv_cov_A)
+    term2 = np.einsum('...ij,j->...i', inv_At_inv_cov_A, e)
+    W = np.einsum('...ij,...j->...i', inv_cov_A, term2)
+    print('cILC weights computed. Shape: ' + str(W.shape))
+    print('\nVerifying constraints...')
+    w_tsz = np.einsum('...i,i->...', W, A[:, 0])
+    w_ksz = np.einsum('...i,i->...', W, A[:, 1])
+    a_cmb = np.array([1.0, 1.0, 1.0])
+    w_cmb = np.einsum('...i,i->...', W, a_cmb)
+    print('  Max absolute error for tSZ preservation (W^T a_tsz = 1): ' + str(np.max(np.abs(w_tsz - 1.0))))
+    print('  Max absolute error for kSZ nulling (W^T a_ksz = 0): ' + str(np.max(np.abs(w_ksz - 0.0))))
+    print('  Max absolute error for CMB nulling (W^T a_cmb = 0): ' + str(np.max(np.abs(w_cmb - 0.0))))
+    print('\nSaving weights and covariance matrix...')
+    np.save('data/cilc_weights.npy', W)
+    np.save('data/noise_cov.npy', cov)
+    print('Saved to data/cilc_weights.npy and data/noise_cov.npy')
+    print('\nTesting cILC on the first noise realization...')
+    n90 = noise_maps[90][0]
+    n150 = noise_maps[150][0]
+    n217 = noise_maps[217][0]
+    fft_n = np.stack([np.fft.fft2(n90, norm='ortho'), np.fft.fft2(n150, norm='ortho'), np.fft.fft2(n217, norm='ortho')], axis=-1)
+    cilc_fft = np.sum(W * fft_n, axis=-1)
+    cilc_map = np.real(np.fft.ifft2(cilc_fft, norm='ortho'))
+    print('  Original noise std: 90GHz=' + str(np.std(n90)) + ', 150GHz=' + str(np.std(n150)) + ', 217GHz=' + str(np.std(n217)))
+    print('  cILC noise std: ' + str(np.std(cilc_map)))
+    print('Step 1 completed successfully.')
