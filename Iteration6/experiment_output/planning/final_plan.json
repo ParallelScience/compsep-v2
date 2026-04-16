@@ -1,0 +1,55 @@
+{
+    "sub_tasks": [
+        {
+            "bullet_points": [
+                "Partition the 1523 patches into fixed train (80%), validation (10%), and test (10%) splits using a seeded random number generator and save the indices to disk.",
+                "Compute per-channel mean and standard deviation statistics from the training split only and save these to disk for consistent use in all subsequent steps.",
+                "Implement a data loader class that handles loading, normalization, and augmentation (rotations/flips) for the multi-frequency input maps and ground truth.",
+                "Pre-calculate and cache unit conversion factors (e.g., jysr2uk) to minimize redundant computation."
+            ],
+            "sub_task": "Implement a robust data loading pipeline with fixed data splits and normalization statistics.",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Implement the U-Net architecture using PyTorch, incorporating gated cross-attention layers to fuse SO-LAT and Planck channels.",
+                "Define the composite loss function L = L_L1 + lambda_1 * L_spec + lambda_2 * L_corr, with L_spec using utils.powers for l in [1000, 5000].",
+                "Train the model on the training split, monitoring validation loss at each epoch with early stopping (patience of 10 epochs).",
+                "Save the final model checkpoint with the best validation loss to disk."
+            ],
+            "sub_task": "Construct and train the multi-scale U-Net with gated cross-attention.",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Perform beam deconvolution on all input frequency maps to a common resolution before forming the linear combination.",
+                "Configure the cILC to null CIB spectral signatures while preserving the tSZ signal.",
+                "Apply the cILC to the test set to generate baseline tSZ maps.",
+                "Compute MSE and bias metrics for the cILC baseline to facilitate comparison with the SR-DAE."
+            ],
+            "sub_task": "Implement the constrained Internal Linear Combination (cILC) as a linear benchmark.",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Load the best SR-DAE checkpoint and perform inference on the test set, ensuring outputs are converted back from normalized space to native dimensionless units.",
+                "Compute residual maps R = tSZ_true - tSZ_pred and cross-correlation coefficients between R and input CIB maps for both models.",
+                "Compute the transfer function T(l) for both models to quantify resolution gain.",
+                "Compute the tSZ power spectrum for both models and compare against the FLAMINGO ground-truth power spectrum across angular scales.",
+                "Generate and save plots: transfer functions T(l), residual maps, CIB cross-correlation, and power spectrum comparisons."
+            ],
+            "sub_task": "Evaluate the SR-DAE and cILC models and generate all required figures.",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Synthesize quantitative results (MSE, bias, transfer function values at specific l bins, cross-correlation coefficients) from the SR-DAE and cILC comparisons.",
+                "Report all key metrics as specific numerical values with patch-to-patch standard deviations or confidence intervals.",
+                "Interpret the transfer function analysis and the power spectrum comparison.",
+                "Discuss the effectiveness of the SR-DAE in disentangling tSZ from CIB and noise, and provide a final assessment of the model's performance and physical validity."
+            ],
+            "sub_task": "Write the final Results section of the research report.",
+            "sub_task_agent": "researcher"
+        }
+    ]
+}
