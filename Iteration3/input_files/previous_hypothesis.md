@@ -1,0 +1,7 @@
+The current SR-DAE suffers from peak-intensity attenuation and systematic bias in massive clusters because the wMSE/L1 loss functions treat all high-intensity pixels as equally important, failing to account for the physical pressure profile shape of the tSZ signal. I hypothesize that replacing the pixel-wise intensity-based weighting with a "Profile-Aware Multi-Scale Loss" (PAML) will mitigate this bias. 
+
+PAML will consist of two components: 
+1) A Multi-Scale Structural Similarity (MS-SSIM) loss to preserve the morphological integrity of cluster cores across different spatial frequencies, preventing the "smoothing" effect currently observed.
+2) A "Radial Profile Consistency" term that calculates the azimuthally averaged radial profile of the reconstructed cluster candidates (identified via a simple thresholding mask) and penalizes deviations from the expected NFW-like pressure profile derived from the FLAMINGO simulation statistics. 
+
+By constraining the model to reconstruct the *shape* of the pressure profile rather than just the *amplitude* of individual pixels, the network will be forced to maintain the high-frequency core intensity while correctly modeling the diffuse outskirts, thereby resolving the negative bias in massive clusters without requiring an adversarial GAN component that risks hallucination.
