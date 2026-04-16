@@ -1,0 +1,97 @@
+
+###### PROMPT BEGINS ########
+Human: You are a scientific paper classifier. Your task is to determine the most appropriate top-level arXiv archive for the following paper.
+
+**Paper Title:** Guided Super-Resolution Denoising of Thermal Sunyaev-Zel'dovich Maps using a Conditional Diffusion Model
+
+**Abstract:** Reconstructing high-resolution maps of the thermal Sunyaev-Zel'dovich (tSZ) effect, a crucial tracer of baryonic gas pressure, is fundamentally limited by instrumental noise and foreground contamination from the Cosmic Infrared Background (CIB). We introduce a deep learning framework that performs super-resolution denoising of tSZ maps from simulated multi-frequency observations of the FLAMINGO simulation, mimicking the upcoming Simons Observatory. Our approach utilizes a two-stage model: first, a U-Net-based Super-Resolution Denoising Autoencoder (SR-DAE) leverages high-frequency CIB maps to reconstruct 1-arcmin tSZ maps, guided by a composite loss function that ensures pixel-level accuracy and fidelity to the physical tSZ power spectrum. Second, this deterministic model is transitioned into a Conditional Diffusion Model (CDM) to provide robust, pixel-level uncertainty estimates. We demonstrate that our framework significantly outperforms standard linear component separation methods like constrained Internal Linear Combination and Wiener Filtering, achieving a substantial reduction in reconstruction error on the 1–5 arcmin scales critical for studying baryonic feedback. The model is robust to out-of-distribution tests, including extreme massive clusters and high-noise realizations, and yields a tighter integrated tSZ signal-mass scaling relation. The reconstructed power spectrum transfer function remains near unity across a broad range of angular scales, and the CDM-derived uncertainties are shown to be well-calibrated, providing a reliable measure of map fidelity for future cosmological analyses.
+
+**Archives:**
+- astro-ph: Astrophysics — cosmology, galaxies, stellar physics, planetary science, high-energy astrophysics, instrumentation
+- cond-mat: Condensed Matter — materials science, superconductivity, quantum gases, soft matter, statistical mechanics
+- cs: Computer Science — AI, machine learning, NLP, computer vision, algorithms, networking, security, software
+- econ: Economics — econometrics, general economics, theoretical economics
+- eess: Electrical Engineering and Systems Science — signal processing, image/video processing, audio/speech, control
+- gr-qc: General Relativity and Quantum Cosmology — gravitational physics, gravitational waves, black holes
+- hep-ex: High Energy Physics - Experiment — particle physics experiments, collider results
+- hep-lat: High Energy Physics - Lattice — lattice field theory, lattice QCD
+- hep-ph: High Energy Physics - Phenomenology — theoretical particle physics connected to experiment
+- hep-th: High Energy Physics - Theory — string theory, quantum field theory, supersymmetry
+- math: Mathematics — algebra, geometry, topology, analysis, probability, number theory, optimization
+- math-ph: Mathematical Physics — mathematical methods for physics problems
+- nlin: Nonlinear Sciences — chaos, pattern formation, solitons, integrable systems, self-organization
+- nucl-ex: Nuclear Experiment — experimental nuclear physics
+- nucl-th: Nuclear Theory — nuclear structure theory, hadron models, neutron stars
+- physics: Physics (General) — classical, computational, fluid dynamics, optics, plasma, applied, biological, chemical physics
+- q-bio: Quantitative Biology — biomolecules, genomics, neuroscience, populations, quantitative methods
+- q-fin: Quantitative Finance — computational finance, portfolio management, risk, pricing, trading
+- quant-ph: Quantum Physics — quantum information, computation, entanglement, foundations, optics
+- stat: Statistics — methodology, applications, machine learning (with statistical grounding), computation
+
+Select the single most appropriate archive for this paper. If the paper spans multiple fields, choose the one where the paper makes its primary contribution.
+
+###### PROMPT ENDS ########
+
+archive='astro-ph' justification="The paper focuses on the reconstruction of thermal Sunyaev-Zel'dovich maps for cosmological analysis, which is a core topic in astrophysics and cosmology."
+###### PROMPT BEGINS ########
+Human: You are a scientific paper classifier. You have already determined that this paper belongs to the **astro-ph** archive on arXiv. Now select the specific subcategory.
+
+**Paper Title:** Guided Super-Resolution Denoising of Thermal Sunyaev-Zel'dovich Maps using a Conditional Diffusion Model
+
+**Abstract:** Reconstructing high-resolution maps of the thermal Sunyaev-Zel'dovich (tSZ) effect, a crucial tracer of baryonic gas pressure, is fundamentally limited by instrumental noise and foreground contamination from the Cosmic Infrared Background (CIB). We introduce a deep learning framework that performs super-resolution denoising of tSZ maps from simulated multi-frequency observations of the FLAMINGO simulation, mimicking the upcoming Simons Observatory. Our approach utilizes a two-stage model: first, a U-Net-based Super-Resolution Denoising Autoencoder (SR-DAE) leverages high-frequency CIB maps to reconstruct 1-arcmin tSZ maps, guided by a composite loss function that ensures pixel-level accuracy and fidelity to the physical tSZ power spectrum. Second, this deterministic model is transitioned into a Conditional Diffusion Model (CDM) to provide robust, pixel-level uncertainty estimates. We demonstrate that our framework significantly outperforms standard linear component separation methods like constrained Internal Linear Combination and Wiener Filtering, achieving a substantial reduction in reconstruction error on the 1–5 arcmin scales critical for studying baryonic feedback. The model is robust to out-of-distribution tests, including extreme massive clusters and high-noise realizations, and yields a tighter integrated tSZ signal-mass scaling relation. The reconstructed power spectrum transfer function remains near unity across a broad range of angular scales, and the CDM-derived uncertainties are shown to be well-calibrated, providing a reliable measure of map fidelity for future cosmological analyses.
+
+**Methods (if available):** \subsection{Simulations and dataset}
+The data used to train and evaluate our models are derived from the FLAMINGO cosmological hydrodynamical simulations. We generate realistic sky patches that mimic the expected observations from the upcoming Simons Observatory (SO). Each data sample consists of a set of six multi-frequency maps corresponding to the SO frequency bands at 90, 150, 217, 353, 545, and 857 GHz. These maps include the thermal Sunyaev-Zel'dovich (tSZ) effect, the Cosmic Infrared Background (CIB), and instrumental noise characteristic of the SO. The ground truth is the clean, high-resolution (1-arcmin) tSZ Compton-$y$ map from the simulation.
+
+The full dataset comprises 1523 flat-sky patches. To ensure robust generalization and prevent data leakage, we employ a rigorous splitting strategy. First, we identify and isolate the top 5\% of patches containing the most massive galaxy clusters (based on peak tSZ signal) to form a dedicated Out-of-Distribution (OOD) test set. The remaining patches are then split into a training set (1066 patches), a validation set (228 patches), and a standard test set (229 patches).
+
+For network training, the six-channel input maps are normalized on a channel-by-channel basis using the global mean and standard deviation computed across the training set. The target tSZ maps are also normalized before being used in the training of the Conditional Diffusion Model.
+
+\subsection{Linear baseline models}
+To provide a benchmark for our deep learning framework, we implemented two standard linear component separation methods.
+\begin{itemize}
+    \item \textbf{Constrained Internal Linear Combination (cILC):} This method operates in map space, applying a set of weights to the multi-frequency observations to produce a single reconstructed map. The weights are calculated to minimize the variance of the output map under two constraints: unity response to the tSZ signal's frequency spectrum and zero response (nulling) to the CIB frequency spectrum. The spectral signatures for this process were derived directly from the FLAMINGO simulation data.
+    \item \textbf{Wiener Filter (WF):} This method operates in harmonic space. The filter is constructed using the angular power spectra of the signal (tSZ) and noise (instrumental noise and other foregrounds), estimated from the training dataset. It optimally suppresses modes where the noise power dominates the signal power, providing the minimum mean squared error linear reconstruction under the assumption of Gaussian statistics.
+\end{itemize}
+
+\subsection{Super-resolution denoising autoencoder}
+The first stage of our framework is a deterministic Super-Resolution Denoising Autoencoder (SR-DAE). The network architecture is based on a U-Net with gated cross-attention mechanisms, which allows the model to effectively leverage spatial information from the high-frequency CIB-dominated channels to guide the reconstruction of the tSZ signal in the lower-frequency channels.
+
+The SR-DAE is trained for 20 epochs to minimize a composite loss function $\mathcal{L}$, designed to enforce both pixel-level accuracy and statistical fidelity:
+\begin{equation}
+    \mathcal{L} = \mathcal{L}_{L1} + \lambda_1 \mathcal{L}_{spec} + \lambda_2 \mathcal{L}_{corr}
+\end{equation}
+where $\mathcal{L}_{L1}$ is the mean absolute error between the reconstructed map and the ground truth tSZ map, ensuring pixel-level accuracy. The spectral loss, $\mathcal{L}_{spec}$, penalizes differences between the power spectra of the reconstructed and true maps, ensuring that the statistical properties and physical structures across different angular scales are correctly recovered. The final term, $\mathcal{L}_{corr}$, is a normalized cross-correlation penalty between the reconstruction residual and the input CIB maps, which explicitly forces the model to learn a tSZ representation that is orthogonal to the CIB foregrounds.
+
+\subsection{Conditional diffusion model for uncertainty quantification}
+To move beyond a single point estimate and provide robust uncertainty quantification, we transition the deterministic SR-DAE into a probabilistic framework. We employ a Conditional Diffusion Model (CDM), which uses the pre-trained weights of the SR-DAE as its backbone. The CDM is trained to learn the full conditional probability distribution $p(\text{tSZ} | \text{Observed})$.
+
+The model is trained for 15 epochs using a linear noise schedule and mixed-precision computation to optimize the noise prediction task. During inference, we use a 50-step Denoising Diffusion Implicit Model (DDIM) sampler to generate multiple (10) realizations of the tSZ map for each input observation. The pixel-wise mean of these realizations serves as the final reconstructed map, while the pixel-wise variance provides a direct, well-motivated estimate of the reconstruction uncertainty.
+
+\subsection{Evaluation metrics}
+The performance of our models and the baselines is assessed through a comprehensive suite of metrics designed to probe different aspects of reconstruction quality.
+\begin{itemize}
+    \item \textbf{Out-of-Distribution Robustness:} We evaluate the models on the withheld OOD test set of massive clusters and on test patches injected with high levels of instrumental noise (95th percentile of noise realizations) to test their robustness to extreme physical conditions and low signal-to-noise regimes. A "Null Test," where pure noise maps are fed into the network, is used to ensure the model does not hallucinate signals.
+    \item \textbf{Power Spectrum Transfer Function:} To quantify the fidelity of the reconstruction in harmonic space, we compute the transfer function:
+    \begin{equation}
+        T(\ell) = \frac{C_{\ell}^{\text{cross}}}{C_{\ell}^{\text{true}}}
+    \end{equation}
+    where $C_{\ell}^{\text{cross}}$ is the cross-power spectrum between the reconstructed map and the ground truth, and $C_{\ell}^{\text{true}}$ is the auto-power spectrum of the ground truth map. A value of $T(\ell) \approx 1$ indicates a statistically unbiased recovery of power at angular scale $\ell$.
+    \item \textbf{Astrophysical Scaling Relation:} We validate the physical content of the reconstructed maps by measuring the integrated Compton-$y$ parameter, $Y_{SZ}$, for clusters and comparing it against a mass proxy (the peak tSZ signal). We then compare the scatter and bias of this $Y_{SZ}-M$ relation produced by each method.
+    \item \textbf{Uncertainty Calibration:} The reliability of the CDM-derived uncertainties is assessed using the Probability Integral Transform (PIT). A uniform PIT histogram indicates that the predicted uncertainties are statistically well-calibrated.
+    \item \textbf{Reconstruction Gain:} We quantify the overall improvement of our models over the linear baselines by computing the gain ratio, defined as the ratio of the residual power spectrum of the cILC reconstruction to that of the deep learning model, as a function of multipole $\ell$.
+\end{itemize}
+
+**Available subcategories in astro-ph:**
+- astro-ph.CO: Cosmology and Nongalactic Astrophysics — Phenomenology of early universe, cosmic microwave background, cosmological parameters, primordial element abundances, extragalactic distance scale, large-scale structure of the universe, dark energy and dark matter.
+- astro-ph.EP: Earth and Planetary Astrophysics — Interplanetary medium, planetary physics, planetary astrobiology, extrasolar planets, solar system formation and evolution, comets, asteroids, meteors.
+- astro-ph.GA: Astrophysics of Galaxies — Phenomena pertaining to galaxies or the Milky Way. Star clusters, HII regions, interstellar medium, molecular clouds, galactic structure, formation and evolution.
+- astro-ph.HE: High Energy Astrophysical Phenomena — Cosmic ray production, acceleration, propagation, detection. Gamma ray astronomy. Supernovae, neutron stars, pulsars, black holes, X-ray binaries, active galactic nuclei.
+- astro-ph.IM: Instrumentation and Methods for Astrophysics — Detector and telescope design, experiment proposals, laboratory astrophysics, data analysis methods, statistical methods, software and simulations.
+- astro-ph.SR: Solar and Stellar Astrophysics — White dwarfs, brown dwarfs, cataclysmic variables. Star formation and protostellar systems. Stellar structure, evolution, nucleosynthesis, atmospheres. The Sun.
+
+Select one primary subcategory and up to 3 secondary subcategories (from any archive) that also apply. The primary must be from the list above. Secondary categories may come from any arXiv category if the paper is interdisciplinary.
+
+###### PROMPT ENDS ########
+
+primary_category='astro-ph.CO' secondary_categories=['astro-ph.IM', 'cs.LG'] justification="The paper focuses on the thermal Sunyaev-Zel'dovich effect, which is a key probe of cosmology and large-scale structure (astro-ph.CO). The methodology relies heavily on advanced data analysis, deep learning, and simulation techniques (astro-ph.IM, cs.LG)."

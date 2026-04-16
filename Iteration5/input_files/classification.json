@@ -1,0 +1,8 @@
+{
+  "primary_category": "astro-ph.CO",
+  "secondary_categories": [
+    "astro-ph.IM",
+    "cs.LG"
+  ],
+  "justification": "The paper focuses on the thermal Sunyaev-Zel'dovich effect, which is a key probe of cosmology and large-scale structure (astro-ph.CO). The methodology relies heavily on advanced data analysis, deep learning, and simulation techniques (astro-ph.IM, cs.LG)."
+}

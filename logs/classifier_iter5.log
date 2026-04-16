@@ -1,0 +1,7 @@
+Classifier: Step 1 — Determining archive...
+  Archive: astro-ph — The paper focuses on the reconstruction of thermal Sunyaev-Zel'dovich maps for cosmological analysis, which is a core topic in astrophysics and cosmology.
+Classifier: Step 2 — Determining subcategory within 'astro-ph'...
+  Primary: astro-ph.CO
+  Secondary: astro-ph.IM, cs.LG
+  Justification: The paper focuses on the thermal Sunyaev-Zel'dovich effect, which is a key probe of cosmology and large-scale structure (astro-ph.CO). The methodology relies heavily on advanced data analysis, deep learning, and simulation techniques (astro-ph.IM, cs.LG).
+Classification completed in 0 min 1 sec. Cost: $0.0000
