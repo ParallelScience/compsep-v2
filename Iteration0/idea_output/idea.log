@@ -1,0 +1,1540 @@
+
+###### PROMPT BEGINS ########
+Human: 
+**Role**: You are a Senior Scientific Researcher.
+**Objective**: Based on the provided dataset description and potential previous ideas, generate 10 distinct, high-impact research ideas for a scientific project. 
+
+**Task**: 
+Generate 10 research ideas that could lead to meaningful scientific discovery. These ideas must be diverse in their approach to the data and must be different to previous existing ideas.
+
+**Operational Constraints**:
+- We are trying to sample the ideas space as widely as possible. Thus, if there are existing ideas, make the 10 ideas as different as possible from the existing ones.
+- The 10 ideas should also be as different from each other as possible.
+- **Conciseness**: Each idea should be 3-4 sentences max. Focus on the "Research Question," not the execution.
+- **No Methodology**: Do not include plans, code, or specific algorithms. Only state the *Research Objective*.
+- **Consistency**: The ideas must strictly adhere to the constraints and physical reality described in the data description.
+- **Zero Redundancy**: If two ideas feel similar, discard one and find a new scientific angle.
+- Each idea must consist of a title and a brief description of it.
+
+Data description:
+# Dataset Description: FLAMINGO Lensed Component-Separation Maps
+
+This dataset consists of flat-sky cut maps derived from full-sky maps of the cosmic microwave background (CMB), thermal and kinetic Sunyaev-Zel'dovich effects (tSZ/kSZ), and the cosmic infrared background (CIB). The sky signal maps originate from the FLAMINGO L1_m9 HYDRO_FIDUCIAL simulation (lightcone0, Jeger rotation) — a large-volume (1 Gpc comoving box) hydrodynamical simulation with self-consistent baryonic physics (radiative cooling, star formation, AGN feedback, diffuse gas flows).
+
+The CMB is a Gaussian realization lensed by the FLAMINGO convergence map (κ) via lenspyx, using Planck-like cosmology (h=0.6736, n_s=0.965, A_s=2.1e-9, seed=42).
+
+## File Inventory (absolute paths, verified)
+
+All files are under `/home/node/data/compsep_data/cut_maps/`.
+
+### Individual component maps — ground truth, 1 arcmin beam
+Shape: **(1523, 256, 256)**, dtype **float64**
+
+- `/home/node/data/compsep_data/cut_maps/lensed_cmb.npy` — Lensed CMB temperature, µK_CMB
+- `/home/node/data/compsep_data/cut_maps/tsz.npy` — tSZ Compton-y parameter, dimensionless
+- `/home/node/data/compsep_data/cut_maps/ksz.npy` — kSZ Doppler-b parameter, dimensionless
+- `/home/node/data/compsep_data/cut_maps/cib_90.npy` — CIB at 90 GHz, Jy/sr (delta-bandpass)
+- `/home/node/data/compsep_data/cut_maps/cib_150.npy` — CIB at 150 GHz, Jy/sr (delta-bandpass)
+- `/home/node/data/compsep_data/cut_maps/cib_217.npy` — CIB at 217 GHz, Jy/sr (bandpass-integrated)
+- `/home/node/data/compsep_data/cut_maps/cib_353.npy` — CIB at 353 GHz, Jy/sr (bandpass-integrated)
+- `/home/node/data/compsep_data/cut_maps/cib_545.npy` — CIB at 545 GHz, Jy/sr (bandpass-integrated)
+- `/home/node/data/compsep_data/cut_maps/cib_857.npy` — CIB at 857 GHz, Jy/sr (bandpass-integrated)
+
+### Stacked (observed) signal maps — frequency-specific beam, no noise
+Shape: **(1523, 256, 256)**, dtype **float64**, units **µK_CMB**
+
+- `/home/node/data/compsep_data/cut_maps/stacked_90.npy` — 90 GHz total signal, beam FWHM 2.2 arcmin (SO LAT)
+- `/home/node/data/compsep_data/cut_maps/stacked_150.npy` — 150 GHz total signal, beam FWHM 1.4 arcmin (SO LAT)
+- `/home/node/data/compsep_data/cut_maps/stacked_217.npy` — 217 GHz total signal, beam FWHM 1.0 arcmin (SO LAT)
+- `/home/node/data/compsep_data/cut_maps/stacked_353.npy` — 353 GHz total signal, beam FWHM 4.5 arcmin (Planck HFI)
+- `/home/node/data/compsep_data/cut_maps/stacked_545.npy` — 545 GHz total signal, beam FWHM 4.72 arcmin (Planck HFI)
+- `/home/node/data/compsep_data/cut_maps/stacked_857.npy` — 857 GHz total signal, beam FWHM 4.42 arcmin (Planck HFI)
+
+The stacked signal is the linear mixture of all components in µK_CMB:
+  signal(freq) = CIB(freq)*jysr2uk(freq) + tSZ*f_tSZ(freq) + kSZ*f_kSZ + lensed_CMB
+then smoothed with the frequency-specific beam. Individual component maps have a 1 arcmin beam.
+
+### Noise maps
+
+**Simons Observatory (SO) LAT noise** — 3000 independent Gaussian realizations
+Shape: **(3000, 256, 256)**, dtype **float64**, units **µK_CMB**
+
+- `/home/node/data/compsep_data/cut_maps/so_noise/90.npy`
+- `/home/node/data/compsep_data/cut_maps/so_noise/150.npy`
+- `/home/node/data/compsep_data/cut_maps/so_noise/217.npy`
+
+SO noise is drawn from the SO LAT v3.1 temperature noise power spectrum (mode 2, elevation 50°, f_sky=0.4). 90 and 150 GHz are correlated (Cholesky decomposition); 217 GHz is independent. When sampling SO noise, the noise index does NOT need to match the sky patch index.
+
+**Planck FFP10 noise** — 100 MC realizations per high-frequency channel
+Shape: **(1523, 256, 256)**, dtype **float64**
+Filename pattern: `planck_noise_{freq}_{i}.npy`, freq ∈ {353, 545, 857}, i ∈ {0, …, 99}
+
+- `/home/node/data/compsep_data/cut_maps/planck_noise/planck_noise_353_{0..99}.npy` — units: K_CMB → multiply by 1e6 to get µK_CMB
+- `/home/node/data/compsep_data/cut_maps/planck_noise/planck_noise_545_{0..99}.npy` — units: MJy/sr → multiply by 1e6 * jysr2uk(545) to get µK_CMB
+- `/home/node/data/compsep_data/cut_maps/planck_noise/planck_noise_857_{0..99}.npy` — units: MJy/sr → multiply by 1e6 * jysr2uk(857) to get µK_CMB
+
+For Planck noise, the patch index MUST match the sky patch index.
+
+## Spectral Response and Utility Functions
+
+A `utils.py` module is available at `/home/node/data/compsep_data/utils.py`. **Always import it using the absolute path or by adding its directory to sys.path:**
+
+```python
+import sys
+sys.path.insert(0, '/home/node/data/compsep_data')
+import utils
+```
+
+Key functions in utils.py:
+- `utils.tsz(freq_ghz)` — tSZ spectral response in µK_CMB per Compton-y unit
+- `utils.ksz(freq_ghz)` — kSZ spectral response in µK_CMB (= -T_CMB_µK, frequency-independent)
+- `utils.jysr2uk(freq_ghz)` — converts Jy/sr to µK_CMB for CIB at given frequency
+- `utils.powers(a, b, ps=10, ell_n=199, window_alpha=None)` — flat-sky angular auto/cross power spectrum
+- `utils.get_patch_centers(gal_cut, step_size)` — returns list of (lon, lat) patch centers
+
+## Patch Geometry
+
+- 1523 patches, 5°×5°, 256×256 pixels, ≈1.17 arcmin/pixel
+- Full-sky tessellation at 5° step spacing (no galactic cut)
+- Gnomonic (flat-sky) projection, bilinear interpolation from HEALPix nside=8192
+
+## Loading Data (correct absolute paths)
+
+```python
+import sys
+sys.path.insert(0, '/home/node/data/compsep_data')
+import utils
+import numpy as np
+
+BASE = '/home/node/data/compsep_data/cut_maps'
+
+rng = np.random.default_rng(seed=42)
+n_patch = 1523
+n_planck = 100
+n_so = 3000
+
+i_patch = rng.integers(n_patch)   # sky patch index
+i_planck = rng.integers(n_planck) # Planck MC realization index
+i_so = rng.integers(n_so)         # SO noise index (does not need to match i_patch)
+
+# Load observed signal + noise at each frequency
+frequencies = [90, 150, 217, 353, 545, 857]
+patches = {}
+for freq in frequencies:
+    signal = np.load(f'{BASE}/stacked_{freq}.npy')[i_patch]  # µK_CMB
+    if freq <= 217:  # SO noise
+        noise = np.load(f'{BASE}/so_noise/{freq}.npy')[i_so]  # µK_CMB
+    else:  # Planck noise
+        raw = np.load(f'{BASE}/planck_noise/planck_noise_{freq}_{i_planck}.npy')[i_patch]
+        if freq == 353:
+            noise = raw * 1e6                        # K_CMB -> µK_CMB
+        else:
+            noise = raw * 1e6 * utils.jysr2uk(freq) # MJy/sr -> µK_CMB
+    patches[freq] = signal + noise  # µK_CMB
+
+# Load ground truth components
+cmb   = np.load(f'{BASE}/lensed_cmb.npy')[i_patch]  # µK_CMB
+tsz   = np.load(f'{BASE}/tsz.npy')[i_patch]          # Compton-y (dimensionless)
+ksz   = np.load(f'{BASE}/ksz.npy')[i_patch]          # Doppler-b (dimensionless)
+cib90 = np.load(f'{BASE}/cib_90.npy')[i_patch]       # Jy/sr
+```
+
+## CMB Simulation Cosmology
+
+CLASS parameters used:
+- A_s = 2.1e-9, n_s = 0.965, h = 0.6736
+- ω_b = 0.02237, ω_cdm = 0.12, τ_reio = 0.0544, Y_He = 0.2454
+
+## Hardware and Environment
+
+- Python: `/opt/denario-venv/bin/python`
+- *64 vCPUs* (AMD Ryzen Threadripper PRO 9995WX), *128 GB RAM*
+- *NVIDIA RTX PRO 6000 Blackwell Edition, 96 GB VRAM*, CUDA 13.0
+- PyTorch GPU: use `device='cuda'`
+- Multiprocessing: limit to ~8–16 workers to avoid oversubscription
+- Set `OMP_NUM_THREADS` when using NumPy/SciPy with multiprocessing
+- Load data patch-by-patch or in small batches; avoid loading all 1523 patches for all frequencies simultaneously (total data volume is large)
+
+
+
+
+
+
+
+
+Respond in the following format:
+
+\\begin{IDEAS}
+<IDEAS>
+\\end{IDEAS}
+
+In <IDEAS>, put the ideas you have generated. 
+
+###### PROMPT ENDS ########
+
+\begin{IDEAS}
+1. **Cross-Frequency CIB-tSZ Spatial Correlation Analysis**
+Investigate the degree of spatial correlation between the Cosmic Infrared Background (CIB) and the thermal Sunyaev-Zel'dovich (tSZ) effect across various galactic environments. This research objective aims to quantify how the thermal state of the intracluster medium relates to the star-formation history of host galaxies, providing constraints on AGN feedback efficiency.
+
+2. **Non-Gaussianity Mapping of kSZ-CMB Lensing Convergence**
+Examine the higher-order statistical coupling between kinetic Sunyaev-Zel'dovich (kSZ) signals and the CMB lensing convergence field. The objective is to determine if local kSZ anisotropies can serve as a tracer for small-scale structure formation, potentially revealing non-Gaussian signatures missed by standard power spectrum analyses.
+
+3. **Multi-Band Beam Deconvolution and Noise Robustness**
+Evaluate the performance of blind source separation techniques in the presence of heterogeneous frequency-dependent beams and non-stationary instrumental noise. The goal is to establish a metric for signal-to-noise recovery limits when recovering the ground-truth CMB component from mixed foregrounds with varying beam resolutions.
+
+4. **Baryonic Feedback Impacts on Small-Scale CMB Power**
+Analyze how the hydrodynamical baryonic physics in the FLAMINGO simulation alters the small-scale CMB temperature power spectrum compared to analytical Gaussian predictions. This project aims to identify specific multipole regimes where AGN feedback and radiative cooling introduce systematic biases in primordial cosmology.
+
+5. **Local Spectral Index Variability in CIB Emissions**
+Quantify the spatial variation of the CIB spectral energy distribution across the 90-857 GHz range by comparing local pixel-wise power. The research objective is to determine if a single modified blackbody model is sufficient to describe CIB fluctuations or if local environmental factors require a multi-parameter spectral index.
+
+6. **Kinetic SZ Signal Recovery via CIB-Template Subtraction**
+Test the feasibility of isolating the kSZ signal by utilizing the high-frequency CIB maps as a spatial template for foreground cleaning. The objective is to determine the theoretical limit of kSZ detection given the degeneracy between CIB contamination and Doppler-induced temperature shifts.
+
+7. **Probing Large-Scale Structure with tSZ-Lensing Cross-Correlations**
+Quantify the cross-correlation between the tSZ Compton-y parameter and the CMB lensing convergence field as a function of redshift-proxy frequency bands. This research seeks to constrain the growth rate of structure and the evolution of the gas fraction in massive halos across cosmic time.
+
+8. **Information-Theoretic Complexity of CMB Foreground Masking**
+Measure the Shannon entropy and mutual information between the observed total signal and individual components (CMB, tSZ, kSZ, CIB). The goal is to determine the optimal frequency combination that minimizes the uncertainty in CMB extraction while maximizing the information gain regarding the intervening baryonic matter.
+
+9. **Impact of Lensing-Induced Non-Linearities on Component Separation**
+Analyze how the lensing of the CMB temperature field influences the efficiency of standard linear component separation algorithms. The research objective is to quantify the "noise" floor imposed by gravitational lensing on the recovery of diffuse tSZ and kSZ signals.
+
+10. **Machine Learning of the tSZ-CIB-kSZ Degeneracy Surface**
+Map the degeneracy surface between tSZ, kSZ, and CIB components in the frequency-space domain to identify unique spectral signatures. The objective is to determine if current frequency coverage is sufficient to break the degeneracy between these physical effects or if specific new bands are required for high-fidelity separation.
+\end{IDEAS}
+
+
+###### PROMPT BEGINS ########
+Human: 
+**Role**: Senior Scientific Lead and Final Decision Maker.
+**Objective**: Review the ideas prioritized by the three independent Reviewer Agents and select the single most promising research project to proceed to the implementation phase.
+
+**Context**: 
+A pool of 10 initial ideas was generated. Three independent agents have evaluated those ideas and identified their top selections (provided below). Your role is to serve as the final filter, selecting the "Best of the Best" based on scientific merit and the constraints of the dataset.
+
+**Evaluation Criteria**:
+1. **Scientific Consensus**: Does an idea appear as a top choice for multiple reviewers?
+2. **Execution Readiness**: Given the 'Data Description,' which idea is most likely to produce a valid, non-erroneous scientific result?
+3. **Strategic Impact**: Which project offers the most meaningful contribution to the Foundation's research goals?
+4. **Novelty vs Previous Work**: The selected idea should be as different as possible from any previous ideas to ensure new scientific contributions.
+
+**Operational Constraints**:
+- **Selection Only**: You must select exactly one idea.
+- **Strict Fidelity**: Do not modify, rephrase, or correct the original text of the idea. 
+- **Zero Commentary**: Do not justify your decision, provide pros/cons, or offer any introductory text.
+- **Output Integrity**: Provide **only** the text of the selected idea within the required tags.
+- The selected idea must contain a title and a description of the idea
+
+Data description:
+# Dataset Description: FLAMINGO Lensed Component-Separation Maps
+
+This dataset consists of flat-sky cut maps derived from full-sky maps of the cosmic microwave background (CMB), thermal and kinetic Sunyaev-Zel'dovich effects (tSZ/kSZ), and the cosmic infrared background (CIB). The sky signal maps originate from the FLAMINGO L1_m9 HYDRO_FIDUCIAL simulation (lightcone0, Jeger rotation) — a large-volume (1 Gpc comoving box) hydrodynamical simulation with self-consistent baryonic physics (radiative cooling, star formation, AGN feedback, diffuse gas flows).
+
+The CMB is a Gaussian realization lensed by the FLAMINGO convergence map (κ) via lenspyx, using Planck-like cosmology (h=0.6736, n_s=0.965, A_s=2.1e-9, seed=42).
+
+## File Inventory (absolute paths, verified)
+
+All files are under `/home/node/data/compsep_data/cut_maps/`.
+
+### Individual component maps — ground truth, 1 arcmin beam
+Shape: **(1523, 256, 256)**, dtype **float64**
+
+- `/home/node/data/compsep_data/cut_maps/lensed_cmb.npy` — Lensed CMB temperature, µK_CMB
+- `/home/node/data/compsep_data/cut_maps/tsz.npy` — tSZ Compton-y parameter, dimensionless
+- `/home/node/data/compsep_data/cut_maps/ksz.npy` — kSZ Doppler-b parameter, dimensionless
+- `/home/node/data/compsep_data/cut_maps/cib_90.npy` — CIB at 90 GHz, Jy/sr (delta-bandpass)
+- `/home/node/data/compsep_data/cut_maps/cib_150.npy` — CIB at 150 GHz, Jy/sr (delta-bandpass)
+- `/home/node/data/compsep_data/cut_maps/cib_217.npy` — CIB at 217 GHz, Jy/sr (bandpass-integrated)
+- `/home/node/data/compsep_data/cut_maps/cib_353.npy` — CIB at 353 GHz, Jy/sr (bandpass-integrated)
+- `/home/node/data/compsep_data/cut_maps/cib_545.npy` — CIB at 545 GHz, Jy/sr (bandpass-integrated)
+- `/home/node/data/compsep_data/cut_maps/cib_857.npy` — CIB at 857 GHz, Jy/sr (bandpass-integrated)
+
+### Stacked (observed) signal maps — frequency-specific beam, no noise
+Shape: **(1523, 256, 256)**, dtype **float64**, units **µK_CMB**
+
+- `/home/node/data/compsep_data/cut_maps/stacked_90.npy` — 90 GHz total signal, beam FWHM 2.2 arcmin (SO LAT)
+- `/home/node/data/compsep_data/cut_maps/stacked_150.npy` — 150 GHz total signal, beam FWHM 1.4 arcmin (SO LAT)
+- `/home/node/data/compsep_data/cut_maps/stacked_217.npy` — 217 GHz total signal, beam FWHM 1.0 arcmin (SO LAT)
+- `/home/node/data/compsep_data/cut_maps/stacked_353.npy` — 353 GHz total signal, beam FWHM 4.5 arcmin (Planck HFI)
+- `/home/node/data/compsep_data/cut_maps/stacked_545.npy` — 545 GHz total signal, beam FWHM 4.72 arcmin (Planck HFI)
+- `/home/node/data/compsep_data/cut_maps/stacked_857.npy` — 857 GHz total signal, beam FWHM 4.42 arcmin (Planck HFI)
+
+The stacked signal is the linear mixture of all components in µK_CMB:
+  signal(freq) = CIB(freq)*jysr2uk(freq) + tSZ*f_tSZ(freq) + kSZ*f_kSZ + lensed_CMB
+then smoothed with the frequency-specific beam. Individual component maps have a 1 arcmin beam.
+
+### Noise maps
+
+**Simons Observatory (SO) LAT noise** — 3000 independent Gaussian realizations
+Shape: **(3000, 256, 256)**, dtype **float64**, units **µK_CMB**
+
+- `/home/node/data/compsep_data/cut_maps/so_noise/90.npy`
+- `/home/node/data/compsep_data/cut_maps/so_noise/150.npy`
+- `/home/node/data/compsep_data/cut_maps/so_noise/217.npy`
+
+SO noise is drawn from the SO LAT v3.1 temperature noise power spectrum (mode 2, elevation 50°, f_sky=0.4). 90 and 150 GHz are correlated (Cholesky decomposition); 217 GHz is independent. When sampling SO noise, the noise index does NOT need to match the sky patch index.
+
+**Planck FFP10 noise** — 100 MC realizations per high-frequency channel
+Shape: **(1523, 256, 256)**, dtype **float64**
+Filename pattern: `planck_noise_{freq}_{i}.npy`, freq ∈ {353, 545, 857}, i ∈ {0, …, 99}
+
+- `/home/node/data/compsep_data/cut_maps/planck_noise/planck_noise_353_{0..99}.npy` — units: K_CMB → multiply by 1e6 to get µK_CMB
+- `/home/node/data/compsep_data/cut_maps/planck_noise/planck_noise_545_{0..99}.npy` — units: MJy/sr → multiply by 1e6 * jysr2uk(545) to get µK_CMB
+- `/home/node/data/compsep_data/cut_maps/planck_noise/planck_noise_857_{0..99}.npy` — units: MJy/sr → multiply by 1e6 * jysr2uk(857) to get µK_CMB
+
+For Planck noise, the patch index MUST match the sky patch index.
+
+## Spectral Response and Utility Functions
+
+A `utils.py` module is available at `/home/node/data/compsep_data/utils.py`. **Always import it using the absolute path or by adding its directory to sys.path:**
+
+```python
+import sys
+sys.path.insert(0, '/home/node/data/compsep_data')
+import utils
+```
+
+Key functions in utils.py:
+- `utils.tsz(freq_ghz)` — tSZ spectral response in µK_CMB per Compton-y unit
+- `utils.ksz(freq_ghz)` — kSZ spectral response in µK_CMB (= -T_CMB_µK, frequency-independent)
+- `utils.jysr2uk(freq_ghz)` — converts Jy/sr to µK_CMB for CIB at given frequency
+- `utils.powers(a, b, ps=10, ell_n=199, window_alpha=None)` — flat-sky angular auto/cross power spectrum
+- `utils.get_patch_centers(gal_cut, step_size)` — returns list of (lon, lat) patch centers
+
+## Patch Geometry
+
+- 1523 patches, 5°×5°, 256×256 pixels, ≈1.17 arcmin/pixel
+- Full-sky tessellation at 5° step spacing (no galactic cut)
+- Gnomonic (flat-sky) projection, bilinear interpolation from HEALPix nside=8192
+
+## Loading Data (correct absolute paths)
+
+```python
+import sys
+sys.path.insert(0, '/home/node/data/compsep_data')
+import utils
+import numpy as np
+
+BASE = '/home/node/data/compsep_data/cut_maps'
+
+rng = np.random.default_rng(seed=42)
+n_patch = 1523
+n_planck = 100
+n_so = 3000
+
+i_patch = rng.integers(n_patch)   # sky patch index
+i_planck = rng.integers(n_planck) # Planck MC realization index
+i_so = rng.integers(n_so)         # SO noise index (does not need to match i_patch)
+
+# Load observed signal + noise at each frequency
+frequencies = [90, 150, 217, 353, 545, 857]
+patches = {}
+for freq in frequencies:
+    signal = np.load(f'{BASE}/stacked_{freq}.npy')[i_patch]  # µK_CMB
+    if freq <= 217:  # SO noise
+        noise = np.load(f'{BASE}/so_noise/{freq}.npy')[i_so]  # µK_CMB
+    else:  # Planck noise
+        raw = np.load(f'{BASE}/planck_noise/planck_noise_{freq}_{i_planck}.npy')[i_patch]
+        if freq == 353:
+            noise = raw * 1e6                        # K_CMB -> µK_CMB
+        else:
+            noise = raw * 1e6 * utils.jysr2uk(freq) # MJy/sr -> µK_CMB
+    patches[freq] = signal + noise  # µK_CMB
+
+# Load ground truth components
+cmb   = np.load(f'{BASE}/lensed_cmb.npy')[i_patch]  # µK_CMB
+tsz   = np.load(f'{BASE}/tsz.npy')[i_patch]          # Compton-y (dimensionless)
+ksz   = np.load(f'{BASE}/ksz.npy')[i_patch]          # Doppler-b (dimensionless)
+cib90 = np.load(f'{BASE}/cib_90.npy')[i_patch]       # Jy/sr
+```
+
+## CMB Simulation Cosmology
+
+CLASS parameters used:
+- A_s = 2.1e-9, n_s = 0.965, h = 0.6736
+- ω_b = 0.02237, ω_cdm = 0.12, τ_reio = 0.0544, Y_He = 0.2454
+
+## Hardware and Environment
+
+- Python: `/opt/denario-venv/bin/python`
+- *64 vCPUs* (AMD Ryzen Threadripper PRO 9995WX), *128 GB RAM*
+- *NVIDIA RTX PRO 6000 Blackwell Edition, 96 GB VRAM*, CUDA 13.0
+- PyTorch GPU: use `device='cuda'`
+- Multiprocessing: limit to ~8–16 workers to avoid oversubscription
+- Set `OMP_NUM_THREADS` when using NumPy/SciPy with multiprocessing
+- Load data patch-by-patch or in small batches; avoid loading all 1523 patches for all frequencies simultaneously (total data volume is large)
+
+
+Ideas:
+Idea selected1: 8. **Information-Theoretic Complexity of CMB Foreground Masking**
+Measure the Shannon entropy and mutual information between the observed total signal and individual components (CMB, tSZ, kSZ, CIB). The goal is to determine the optimal frequency combination that minimizes the uncertainty in CMB extraction while maximizing the information gain regarding the intervening baryonic matter.
+Idea selected2: 8. **Information-Theoretic Complexity of CMB Foreground Masking**
+Measure the Shannon entropy and mutual information between the observed total signal and individual components (CMB, tSZ, kSZ, CIB). The goal is to determine the optimal frequency combination that minimizes the uncertainty in CMB extraction while maximizing the information gain regarding the intervening baryonic matter.
+Idea selected3: **Information-Theoretic Complexity of CMB Foreground Masking**
+Measure the Shannon entropy and mutual information between the observed total signal and individual components (CMB, tSZ, kSZ, CIB). The goal is to determine the optimal frequency combination that minimizes the uncertainty in CMB extraction while maximizing the information gain regarding the intervening baryonic matter.
+
+
+
+
+
+
+
+Respond in exactly the following format:
+
+\\begin{IDEA}
+<IDEA>
+\\end{IDEA}
+
+In <IDEA>, put the idea you have selected
+
+###### PROMPT ENDS ########
+
+\begin{IDEA}
+8. **Information-Theoretic Complexity of CMB Foreground Masking**
+Measure the Shannon entropy and mutual information between the observed total signal and individual components (CMB, tSZ, kSZ, CIB). The goal is to determine the optimal frequency combination that minimizes the uncertainty in CMB extraction while maximizing the information gain regarding the intervening baryonic matter.
+\end{IDEA}
+
+
+###### PROMPT BEGINS ########
+Human: 
+**Role**: Skeptical Red Team Reviewer and Scientific Auditor.
+**Objective**: Conduct a rigorous "Stress Test" on the proposed research idea to identify fatal flaws, feasibility gaps, and potential scientific "slop."
+
+**Evaluation Criteria**:
+1. **Data-Hypothesis Alignment**: Does the dataset described actually contain the variables and precision required to test this idea?
+2. **Feasibility & Noise**: Is the signal-to-noise ratio realistic? Is the idea too ambitious for the provided data?
+3. **Redundancy Check**: Does this idea simply repeat a "standard" analysis, or is it a meaningful contribution?
+4. **Physical Reality**: Does the idea violate any constraints or physical laws mentioned in the data description?
+
+**Task**:
+- Critically analyze the "Current Idea" against the "Data Description."
+- If the idea is **unfeasible**, explicitly state why and suggest a "Strategic Pivot" (a new direction that *is* supported by the data).
+- If the idea is **feasible but weak**, identify the specific "weak links" in the logic.
+- Compare it against "Previous Ideas" to ensure the refinement loop is moving forward, not backward.
+
+**Operational Constraints**:
+- **Tone**: Be professional, objective, and intellectually demanding. 
+- **Brevity**: Use high-density bullet points. Do not waste words on pleasantries.
+- **Strict Adherence**: Every criticism must be grounded in the provided 'Data Description.'
+
+**Input Data**:
+- **Data Description**: # Dataset Description: FLAMINGO Lensed Component-Separation Maps
+
+This dataset consists of flat-sky cut maps derived from full-sky maps of the cosmic microwave background (CMB), thermal and kinetic Sunyaev-Zel'dovich effects (tSZ/kSZ), and the cosmic infrared background (CIB). The sky signal maps originate from the FLAMINGO L1_m9 HYDRO_FIDUCIAL simulation (lightcone0, Jeger rotation) — a large-volume (1 Gpc comoving box) hydrodynamical simulation with self-consistent baryonic physics (radiative cooling, star formation, AGN feedback, diffuse gas flows).
+
+The CMB is a Gaussian realization lensed by the FLAMINGO convergence map (κ) via lenspyx, using Planck-like cosmology (h=0.6736, n_s=0.965, A_s=2.1e-9, seed=42).
+
+## File Inventory (absolute paths, verified)
+
+All files are under `/home/node/data/compsep_data/cut_maps/`.
+
+### Individual component maps — ground truth, 1 arcmin beam
+Shape: **(1523, 256, 256)**, dtype **float64**
+
+- `/home/node/data/compsep_data/cut_maps/lensed_cmb.npy` — Lensed CMB temperature, µK_CMB
+- `/home/node/data/compsep_data/cut_maps/tsz.npy` — tSZ Compton-y parameter, dimensionless
+- `/home/node/data/compsep_data/cut_maps/ksz.npy` — kSZ Doppler-b parameter, dimensionless
+- `/home/node/data/compsep_data/cut_maps/cib_90.npy` — CIB at 90 GHz, Jy/sr (delta-bandpass)
+- `/home/node/data/compsep_data/cut_maps/cib_150.npy` — CIB at 150 GHz, Jy/sr (delta-bandpass)
+- `/home/node/data/compsep_data/cut_maps/cib_217.npy` — CIB at 217 GHz, Jy/sr (bandpass-integrated)
+- `/home/node/data/compsep_data/cut_maps/cib_353.npy` — CIB at 353 GHz, Jy/sr (bandpass-integrated)
+- `/home/node/data/compsep_data/cut_maps/cib_545.npy` — CIB at 545 GHz, Jy/sr (bandpass-integrated)
+- `/home/node/data/compsep_data/cut_maps/cib_857.npy` — CIB at 857 GHz, Jy/sr (bandpass-integrated)
+
+### Stacked (observed) signal maps — frequency-specific beam, no noise
+Shape: **(1523, 256, 256)**, dtype **float64**, units **µK_CMB**
+
+- `/home/node/data/compsep_data/cut_maps/stacked_90.npy` — 90 GHz total signal, beam FWHM 2.2 arcmin (SO LAT)
+- `/home/node/data/compsep_data/cut_maps/stacked_150.npy` — 150 GHz total signal, beam FWHM 1.4 arcmin (SO LAT)
+- `/home/node/data/compsep_data/cut_maps/stacked_217.npy` — 217 GHz total signal, beam FWHM 1.0 arcmin (SO LAT)
+- `/home/node/data/compsep_data/cut_maps/stacked_353.npy` — 353 GHz total signal, beam FWHM 4.5 arcmin (Planck HFI)
+- `/home/node/data/compsep_data/cut_maps/stacked_545.npy` — 545 GHz total signal, beam FWHM 4.72 arcmin (Planck HFI)
+- `/home/node/data/compsep_data/cut_maps/stacked_857.npy` — 857 GHz total signal, beam FWHM 4.42 arcmin (Planck HFI)
+
+The stacked signal is the linear mixture of all components in µK_CMB:
+  signal(freq) = CIB(freq)*jysr2uk(freq) + tSZ*f_tSZ(freq) + kSZ*f_kSZ + lensed_CMB
+then smoothed with the frequency-specific beam. Individual component maps have a 1 arcmin beam.
+
+### Noise maps
+
+**Simons Observatory (SO) LAT noise** — 3000 independent Gaussian realizations
+Shape: **(3000, 256, 256)**, dtype **float64**, units **µK_CMB**
+
+- `/home/node/data/compsep_data/cut_maps/so_noise/90.npy`
+- `/home/node/data/compsep_data/cut_maps/so_noise/150.npy`
+- `/home/node/data/compsep_data/cut_maps/so_noise/217.npy`
+
+SO noise is drawn from the SO LAT v3.1 temperature noise power spectrum (mode 2, elevation 50°, f_sky=0.4). 90 and 150 GHz are correlated (Cholesky decomposition); 217 GHz is independent. When sampling SO noise, the noise index does NOT need to match the sky patch index.
+
+**Planck FFP10 noise** — 100 MC realizations per high-frequency channel
+Shape: **(1523, 256, 256)**, dtype **float64**
+Filename pattern: `planck_noise_{freq}_{i}.npy`, freq ∈ {353, 545, 857}, i ∈ {0, …, 99}
+
+- `/home/node/data/compsep_data/cut_maps/planck_noise/planck_noise_353_{0..99}.npy` — units: K_CMB → multiply by 1e6 to get µK_CMB
+- `/home/node/data/compsep_data/cut_maps/planck_noise/planck_noise_545_{0..99}.npy` — units: MJy/sr → multiply by 1e6 * jysr2uk(545) to get µK_CMB
+- `/home/node/data/compsep_data/cut_maps/planck_noise/planck_noise_857_{0..99}.npy` — units: MJy/sr → multiply by 1e6 * jysr2uk(857) to get µK_CMB
+
+For Planck noise, the patch index MUST match the sky patch index.
+
+## Spectral Response and Utility Functions
+
+A `utils.py` module is available at `/home/node/data/compsep_data/utils.py`. **Always import it using the absolute path or by adding its directory to sys.path:**
+
+```python
+import sys
+sys.path.insert(0, '/home/node/data/compsep_data')
+import utils
+```
+
+Key functions in utils.py:
+- `utils.tsz(freq_ghz)` — tSZ spectral response in µK_CMB per Compton-y unit
+- `utils.ksz(freq_ghz)` — kSZ spectral response in µK_CMB (= -T_CMB_µK, frequency-independent)
+- `utils.jysr2uk(freq_ghz)` — converts Jy/sr to µK_CMB for CIB at given frequency
+- `utils.powers(a, b, ps=10, ell_n=199, window_alpha=None)` — flat-sky angular auto/cross power spectrum
+- `utils.get_patch_centers(gal_cut, step_size)` — returns list of (lon, lat) patch centers
+
+## Patch Geometry
+
+- 1523 patches, 5°×5°, 256×256 pixels, ≈1.17 arcmin/pixel
+- Full-sky tessellation at 5° step spacing (no galactic cut)
+- Gnomonic (flat-sky) projection, bilinear interpolation from HEALPix nside=8192
+
+## Loading Data (correct absolute paths)
+
+```python
+import sys
+sys.path.insert(0, '/home/node/data/compsep_data')
+import utils
+import numpy as np
+
+BASE = '/home/node/data/compsep_data/cut_maps'
+
+rng = np.random.default_rng(seed=42)
+n_patch = 1523
+n_planck = 100
+n_so = 3000
+
+i_patch = rng.integers(n_patch)   # sky patch index
+i_planck = rng.integers(n_planck) # Planck MC realization index
+i_so = rng.integers(n_so)         # SO noise index (does not need to match i_patch)
+
+# Load observed signal + noise at each frequency
+frequencies = [90, 150, 217, 353, 545, 857]
+patches = {}
+for freq in frequencies:
+    signal = np.load(f'{BASE}/stacked_{freq}.npy')[i_patch]  # µK_CMB
+    if freq <= 217:  # SO noise
+        noise = np.load(f'{BASE}/so_noise/{freq}.npy')[i_so]  # µK_CMB
+    else:  # Planck noise
+        raw = np.load(f'{BASE}/planck_noise/planck_noise_{freq}_{i_planck}.npy')[i_patch]
+        if freq == 353:
+            noise = raw * 1e6                        # K_CMB -> µK_CMB
+        else:
+            noise = raw * 1e6 * utils.jysr2uk(freq) # MJy/sr -> µK_CMB
+    patches[freq] = signal + noise  # µK_CMB
+
+# Load ground truth components
+cmb   = np.load(f'{BASE}/lensed_cmb.npy')[i_patch]  # µK_CMB
+tsz   = np.load(f'{BASE}/tsz.npy')[i_patch]          # Compton-y (dimensionless)
+ksz   = np.load(f'{BASE}/ksz.npy')[i_patch]          # Doppler-b (dimensionless)
+cib90 = np.load(f'{BASE}/cib_90.npy')[i_patch]       # Jy/sr
+```
+
+## CMB Simulation Cosmology
+
+CLASS parameters used:
+- A_s = 2.1e-9, n_s = 0.965, h = 0.6736
+- ω_b = 0.02237, ω_cdm = 0.12, τ_reio = 0.0544, Y_He = 0.2454
+
+## Hardware and Environment
+
+- Python: `/opt/denario-venv/bin/python`
+- *64 vCPUs* (AMD Ryzen Threadripper PRO 9995WX), *128 GB RAM*
+- *NVIDIA RTX PRO 6000 Blackwell Edition, 96 GB VRAM*, CUDA 13.0
+- PyTorch GPU: use `device='cuda'`
+- Multiprocessing: limit to ~8–16 workers to avoid oversubscription
+- Set `OMP_NUM_THREADS` when using NumPy/SciPy with multiprocessing
+- Load data patch-by-patch or in small batches; avoid loading all 1523 patches for all frequencies simultaneously (total data volume is large)
+
+- **Current Idea**: 8. **Information-Theoretic Complexity of CMB Foreground Masking**
+Measure the Shannon entropy and mutual information between the observed total signal and individual components (CMB, tSZ, kSZ, CIB). The goal is to determine the optimal frequency combination that minimizes the uncertainty in CMB extraction while maximizing the information gain regarding the intervening baryonic matter.    
+
+Respond in the following format:
+
+\\begin{CRITIC}
+<CRITIC>
+\\end{CRITIC}
+
+In <CRITIC>, put your criticism to the idea. Try to be brief in the description.
+
+###### PROMPT ENDS ########
+
+\begin{CRITIC}
+* **Data-Hypothesis Mismatch**: Shannon entropy and mutual information are sensitive to the probability density function (PDF) estimation. Given the non-Gaussian nature of the tSZ, kSZ, and CIB components (which are highly non-linear and spatially correlated), simple binning or Gaussian-assumption estimators will fail to capture the "information" relevant to physical component separation.
+* **Feasibility & Noise**: The proposed metric does not account for the frequency-dependent beam convolution (FWHM 1.0' to 4.72'). The "information" is dominated by the beam-induced correlation rather than the underlying physical signal. Without deconvolution or a multi-scale approach, the entropy calculation will be dominated by the instrument response, not the baryonic physics.
+* **Redundancy Check**: This is a purely descriptive statistical exercise. It lacks a generative or predictive objective. It does not provide a path to *improving* CMB extraction, only a post-hoc measurement of existing data properties.
+* **Strategic Pivot**: Shift from "Information-Theoretic Complexity" to **"Differentiable Component Separation via Neural Posterior Estimation (NPE)."** Use the provided ground truth maps to train a conditional normalizing flow or diffusion model to learn the posterior $P(\text{components} | \text{observed\_frequencies})$. This leverages the high-fidelity FLAMINGO simulations to solve the inverse problem directly, rather than merely measuring the entropy of the mixture.
+\end{CRITIC}
+
+
+###### PROMPT BEGINS ########
+Human: 
+**Role**: Senior Research Scientific.
+**Objective**: Synthesize a primary research idea with expert criticism to produce a refined, groundbreaking, and technically feasible scientific objective.
+
+**Task**:
+You are in an iterative refinement loop (Iteration: 0). Your goal is to take the "Previous Idea," pass it through the filter of the "Critiques," and produce a "Hardened Idea" that is more scientifically rigorous and original than its predecessor.
+
+**Refinement Principles**:
+1. **Address Caveats**: If the critic mentioned a lack of feasibility, adjust the scope of the idea to fit the 'Data Description.'
+2. **Increase Specificity**: Move away from generic goals. Use the statistics and variables found in the data description to make the idea more concrete.
+3. **Internalize Feedback**: Do not explicitly mention the criticism or explain your changes. Instead, weave the solutions directly into the new version of the idea.
+4. **Maintain Grounding**: Ensure the "groundbreaking" aspect remains physically possible within the provided dataset's constraints.
+
+**Operational Constraints**:
+- **Brevity**: Keep the description concise but high-density (max 6 sentences).
+- **Format**: Do not include introductory text or meta-commentary about the process.
+- **Fidelity**: Stick strictly to the guidelines and physical realities described in the data description.
+- The idea must contain a title and a description of the idea
+
+**Input Data**:
+- **Data Description**: # Dataset Description: FLAMINGO Lensed Component-Separation Maps
+
+This dataset consists of flat-sky cut maps derived from full-sky maps of the cosmic microwave background (CMB), thermal and kinetic Sunyaev-Zel'dovich effects (tSZ/kSZ), and the cosmic infrared background (CIB). The sky signal maps originate from the FLAMINGO L1_m9 HYDRO_FIDUCIAL simulation (lightcone0, Jeger rotation) — a large-volume (1 Gpc comoving box) hydrodynamical simulation with self-consistent baryonic physics (radiative cooling, star formation, AGN feedback, diffuse gas flows).
+
+The CMB is a Gaussian realization lensed by the FLAMINGO convergence map (κ) via lenspyx, using Planck-like cosmology (h=0.6736, n_s=0.965, A_s=2.1e-9, seed=42).
+
+## File Inventory (absolute paths, verified)
+
+All files are under `/home/node/data/compsep_data/cut_maps/`.
+
+### Individual component maps — ground truth, 1 arcmin beam
+Shape: **(1523, 256, 256)**, dtype **float64**
+
+- `/home/node/data/compsep_data/cut_maps/lensed_cmb.npy` — Lensed CMB temperature, µK_CMB
+- `/home/node/data/compsep_data/cut_maps/tsz.npy` — tSZ Compton-y parameter, dimensionless
+- `/home/node/data/compsep_data/cut_maps/ksz.npy` — kSZ Doppler-b parameter, dimensionless
+- `/home/node/data/compsep_data/cut_maps/cib_90.npy` — CIB at 90 GHz, Jy/sr (delta-bandpass)
+- `/home/node/data/compsep_data/cut_maps/cib_150.npy` — CIB at 150 GHz, Jy/sr (delta-bandpass)
+- `/home/node/data/compsep_data/cut_maps/cib_217.npy` — CIB at 217 GHz, Jy/sr (bandpass-integrated)
+- `/home/node/data/compsep_data/cut_maps/cib_353.npy` — CIB at 353 GHz, Jy/sr (bandpass-integrated)
+- `/home/node/data/compsep_data/cut_maps/cib_545.npy` — CIB at 545 GHz, Jy/sr (bandpass-integrated)
+- `/home/node/data/compsep_data/cut_maps/cib_857.npy` — CIB at 857 GHz, Jy/sr (bandpass-integrated)
+
+### Stacked (observed) signal maps — frequency-specific beam, no noise
+Shape: **(1523, 256, 256)**, dtype **float64**, units **µK_CMB**
+
+- `/home/node/data/compsep_data/cut_maps/stacked_90.npy` — 90 GHz total signal, beam FWHM 2.2 arcmin (SO LAT)
+- `/home/node/data/compsep_data/cut_maps/stacked_150.npy` — 150 GHz total signal, beam FWHM 1.4 arcmin (SO LAT)
+- `/home/node/data/compsep_data/cut_maps/stacked_217.npy` — 217 GHz total signal, beam FWHM 1.0 arcmin (SO LAT)
+- `/home/node/data/compsep_data/cut_maps/stacked_353.npy` — 353 GHz total signal, beam FWHM 4.5 arcmin (Planck HFI)
+- `/home/node/data/compsep_data/cut_maps/stacked_545.npy` — 545 GHz total signal, beam FWHM 4.72 arcmin (Planck HFI)
+- `/home/node/data/compsep_data/cut_maps/stacked_857.npy` — 857 GHz total signal, beam FWHM 4.42 arcmin (Planck HFI)
+
+The stacked signal is the linear mixture of all components in µK_CMB:
+  signal(freq) = CIB(freq)*jysr2uk(freq) + tSZ*f_tSZ(freq) + kSZ*f_kSZ + lensed_CMB
+then smoothed with the frequency-specific beam. Individual component maps have a 1 arcmin beam.
+
+### Noise maps
+
+**Simons Observatory (SO) LAT noise** — 3000 independent Gaussian realizations
+Shape: **(3000, 256, 256)**, dtype **float64**, units **µK_CMB**
+
+- `/home/node/data/compsep_data/cut_maps/so_noise/90.npy`
+- `/home/node/data/compsep_data/cut_maps/so_noise/150.npy`
+- `/home/node/data/compsep_data/cut_maps/so_noise/217.npy`
+
+SO noise is drawn from the SO LAT v3.1 temperature noise power spectrum (mode 2, elevation 50°, f_sky=0.4). 90 and 150 GHz are correlated (Cholesky decomposition); 217 GHz is independent. When sampling SO noise, the noise index does NOT need to match the sky patch index.
+
+**Planck FFP10 noise** — 100 MC realizations per high-frequency channel
+Shape: **(1523, 256, 256)**, dtype **float64**
+Filename pattern: `planck_noise_{freq}_{i}.npy`, freq ∈ {353, 545, 857}, i ∈ {0, …, 99}
+
+- `/home/node/data/compsep_data/cut_maps/planck_noise/planck_noise_353_{0..99}.npy` — units: K_CMB → multiply by 1e6 to get µK_CMB
+- `/home/node/data/compsep_data/cut_maps/planck_noise/planck_noise_545_{0..99}.npy` — units: MJy/sr → multiply by 1e6 * jysr2uk(545) to get µK_CMB
+- `/home/node/data/compsep_data/cut_maps/planck_noise/planck_noise_857_{0..99}.npy` — units: MJy/sr → multiply by 1e6 * jysr2uk(857) to get µK_CMB
+
+For Planck noise, the patch index MUST match the sky patch index.
+
+## Spectral Response and Utility Functions
+
+A `utils.py` module is available at `/home/node/data/compsep_data/utils.py`. **Always import it using the absolute path or by adding its directory to sys.path:**
+
+```python
+import sys
+sys.path.insert(0, '/home/node/data/compsep_data')
+import utils
+```
+
+Key functions in utils.py:
+- `utils.tsz(freq_ghz)` — tSZ spectral response in µK_CMB per Compton-y unit
+- `utils.ksz(freq_ghz)` — kSZ spectral response in µK_CMB (= -T_CMB_µK, frequency-independent)
+- `utils.jysr2uk(freq_ghz)` — converts Jy/sr to µK_CMB for CIB at given frequency
+- `utils.powers(a, b, ps=10, ell_n=199, window_alpha=None)` — flat-sky angular auto/cross power spectrum
+- `utils.get_patch_centers(gal_cut, step_size)` — returns list of (lon, lat) patch centers
+
+## Patch Geometry
+
+- 1523 patches, 5°×5°, 256×256 pixels, ≈1.17 arcmin/pixel
+- Full-sky tessellation at 5° step spacing (no galactic cut)
+- Gnomonic (flat-sky) projection, bilinear interpolation from HEALPix nside=8192
+
+## Loading Data (correct absolute paths)
+
+```python
+import sys
+sys.path.insert(0, '/home/node/data/compsep_data')
+import utils
+import numpy as np
+
+BASE = '/home/node/data/compsep_data/cut_maps'
+
+rng = np.random.default_rng(seed=42)
+n_patch = 1523
+n_planck = 100
+n_so = 3000
+
+i_patch = rng.integers(n_patch)   # sky patch index
+i_planck = rng.integers(n_planck) # Planck MC realization index
+i_so = rng.integers(n_so)         # SO noise index (does not need to match i_patch)
+
+# Load observed signal + noise at each frequency
+frequencies = [90, 150, 217, 353, 545, 857]
+patches = {}
+for freq in frequencies:
+    signal = np.load(f'{BASE}/stacked_{freq}.npy')[i_patch]  # µK_CMB
+    if freq <= 217:  # SO noise
+        noise = np.load(f'{BASE}/so_noise/{freq}.npy')[i_so]  # µK_CMB
+    else:  # Planck noise
+        raw = np.load(f'{BASE}/planck_noise/planck_noise_{freq}_{i_planck}.npy')[i_patch]
+        if freq == 353:
+            noise = raw * 1e6                        # K_CMB -> µK_CMB
+        else:
+            noise = raw * 1e6 * utils.jysr2uk(freq) # MJy/sr -> µK_CMB
+    patches[freq] = signal + noise  # µK_CMB
+
+# Load ground truth components
+cmb   = np.load(f'{BASE}/lensed_cmb.npy')[i_patch]  # µK_CMB
+tsz   = np.load(f'{BASE}/tsz.npy')[i_patch]          # Compton-y (dimensionless)
+ksz   = np.load(f'{BASE}/ksz.npy')[i_patch]          # Doppler-b (dimensionless)
+cib90 = np.load(f'{BASE}/cib_90.npy')[i_patch]       # Jy/sr
+```
+
+## CMB Simulation Cosmology
+
+CLASS parameters used:
+- A_s = 2.1e-9, n_s = 0.965, h = 0.6736
+- ω_b = 0.02237, ω_cdm = 0.12, τ_reio = 0.0544, Y_He = 0.2454
+
+## Hardware and Environment
+
+- Python: `/opt/denario-venv/bin/python`
+- *64 vCPUs* (AMD Ryzen Threadripper PRO 9995WX), *128 GB RAM*
+- *NVIDIA RTX PRO 6000 Blackwell Edition, 96 GB VRAM*, CUDA 13.0
+- PyTorch GPU: use `device='cuda'`
+- Multiprocessing: limit to ~8–16 workers to avoid oversubscription
+- Set `OMP_NUM_THREADS` when using NumPy/SciPy with multiprocessing
+- Load data patch-by-patch or in small batches; avoid loading all 1523 patches for all frequencies simultaneously (total data volume is large)
+
+- **Critical Feedback**: * **Data-Hypothesis Mismatch**: Shannon entropy and mutual information are sensitive to the probability density function (PDF) estimation. Given the non-Gaussian nature of the tSZ, kSZ, and CIB components (which are highly non-linear and spatially correlated), simple binning or Gaussian-assumption estimators will fail to capture the "information" relevant to physical component separation.
+* **Feasibility & Noise**: The proposed metric does not account for the frequency-dependent beam convolution (FWHM 1.0' to 4.72'). The "information" is dominated by the beam-induced correlation rather than the underlying physical signal. Without deconvolution or a multi-scale approach, the entropy calculation will be dominated by the instrument response, not the baryonic physics.
+* **Redundancy Check**: This is a purely descriptive statistical exercise. It lacks a generative or predictive objective. It does not provide a path to *improving* CMB extraction, only a post-hoc measurement of existing data properties.
+* **Strategic Pivot**: Shift from "Information-Theoretic Complexity" to **"Differentiable Component Separation via Neural Posterior Estimation (NPE)."** Use the provided ground truth maps to train a conditional normalizing flow or diffusion model to learn the posterior $P(\text{components} | \text{observed\_frequencies})$. This leverages the high-fidelity FLAMINGO simulations to solve the inverse problem directly, rather than merely measuring the entropy of the mixture.
+
+Respond in the following format:
+
+\\begin{IDEA}
+<IDEA>
+\\end{IDEA}
+
+In <IDEA>, put the refined idea. 
+
+###### PROMPT ENDS ########
+
+\begin{IDEA}
+**Title**: Simulation-Based Inference of Baryonic Feedback via Differentiable Component Separation
+
+**Description**: This objective implements a conditional normalizing flow (CNF) to solve the inverse problem of mapping frequency-dependent stacked observations to the latent ground-truth components (tSZ, kSZ, and Lensed-CMB). To mitigate the bias introduced by frequency-dependent beam convolution (FWHM 1.0'–4.72'), the architecture incorporates a multi-scale U-Net backbone that learns an implicit deconvolution operator, ensuring the physical signal is disentangled from instrument-induced spatial correlations. The model will be trained on the FLAMINGO L1_m9 HYDRO_FIDUCIAL dataset using a likelihood-free inference framework that minimizes the Kullback–Leibler divergence between the predicted posterior and the true component distributions. By conditioning the flow on specific frequency-dependent noise realizations (SO LAT and Planck FFP10), the framework produces a robust, per-pixel posterior $P(\text{components} | \text{data}, \text{noise})$, quantifying the uncertainty in baryonic feedback signatures. This approach transforms the component separation task from a linear inversion to a generative posterior estimation, effectively isolating non-Gaussian tSZ and kSZ signals from the Gaussian CMB background.
+\end{IDEA}
+
+
+###### PROMPT BEGINS ########
+Human: 
+**Role**: Skeptical Red Team Reviewer and Scientific Auditor.
+**Objective**: Conduct a rigorous "Stress Test" on the proposed research idea to identify fatal flaws, feasibility gaps, and potential scientific "slop."
+
+**Evaluation Criteria**:
+1. **Data-Hypothesis Alignment**: Does the dataset described actually contain the variables and precision required to test this idea?
+2. **Feasibility & Noise**: Is the signal-to-noise ratio realistic? Is the idea too ambitious for the provided data?
+3. **Redundancy Check**: Does this idea simply repeat a "standard" analysis, or is it a meaningful contribution?
+4. **Physical Reality**: Does the idea violate any constraints or physical laws mentioned in the data description?
+
+**Task**:
+- Critically analyze the "Current Idea" against the "Data Description."
+- If the idea is **unfeasible**, explicitly state why and suggest a "Strategic Pivot" (a new direction that *is* supported by the data).
+- If the idea is **feasible but weak**, identify the specific "weak links" in the logic.
+- Compare it against "Previous Ideas" to ensure the refinement loop is moving forward, not backward.
+
+**Operational Constraints**:
+- **Tone**: Be professional, objective, and intellectually demanding. 
+- **Brevity**: Use high-density bullet points. Do not waste words on pleasantries.
+- **Strict Adherence**: Every criticism must be grounded in the provided 'Data Description.'
+
+**Input Data**:
+- **Data Description**: # Dataset Description: FLAMINGO Lensed Component-Separation Maps
+
+This dataset consists of flat-sky cut maps derived from full-sky maps of the cosmic microwave background (CMB), thermal and kinetic Sunyaev-Zel'dovich effects (tSZ/kSZ), and the cosmic infrared background (CIB). The sky signal maps originate from the FLAMINGO L1_m9 HYDRO_FIDUCIAL simulation (lightcone0, Jeger rotation) — a large-volume (1 Gpc comoving box) hydrodynamical simulation with self-consistent baryonic physics (radiative cooling, star formation, AGN feedback, diffuse gas flows).
+
+The CMB is a Gaussian realization lensed by the FLAMINGO convergence map (κ) via lenspyx, using Planck-like cosmology (h=0.6736, n_s=0.965, A_s=2.1e-9, seed=42).
+
+## File Inventory (absolute paths, verified)
+
+All files are under `/home/node/data/compsep_data/cut_maps/`.
+
+### Individual component maps — ground truth, 1 arcmin beam
+Shape: **(1523, 256, 256)**, dtype **float64**
+
+- `/home/node/data/compsep_data/cut_maps/lensed_cmb.npy` — Lensed CMB temperature, µK_CMB
+- `/home/node/data/compsep_data/cut_maps/tsz.npy` — tSZ Compton-y parameter, dimensionless
+- `/home/node/data/compsep_data/cut_maps/ksz.npy` — kSZ Doppler-b parameter, dimensionless
+- `/home/node/data/compsep_data/cut_maps/cib_90.npy` — CIB at 90 GHz, Jy/sr (delta-bandpass)
+- `/home/node/data/compsep_data/cut_maps/cib_150.npy` — CIB at 150 GHz, Jy/sr (delta-bandpass)
+- `/home/node/data/compsep_data/cut_maps/cib_217.npy` — CIB at 217 GHz, Jy/sr (bandpass-integrated)
+- `/home/node/data/compsep_data/cut_maps/cib_353.npy` — CIB at 353 GHz, Jy/sr (bandpass-integrated)
+- `/home/node/data/compsep_data/cut_maps/cib_545.npy` — CIB at 545 GHz, Jy/sr (bandpass-integrated)
+- `/home/node/data/compsep_data/cut_maps/cib_857.npy` — CIB at 857 GHz, Jy/sr (bandpass-integrated)
+
+### Stacked (observed) signal maps — frequency-specific beam, no noise
+Shape: **(1523, 256, 256)**, dtype **float64**, units **µK_CMB**
+
+- `/home/node/data/compsep_data/cut_maps/stacked_90.npy` — 90 GHz total signal, beam FWHM 2.2 arcmin (SO LAT)
+- `/home/node/data/compsep_data/cut_maps/stacked_150.npy` — 150 GHz total signal, beam FWHM 1.4 arcmin (SO LAT)
+- `/home/node/data/compsep_data/cut_maps/stacked_217.npy` — 217 GHz total signal, beam FWHM 1.0 arcmin (SO LAT)
+- `/home/node/data/compsep_data/cut_maps/stacked_353.npy` — 353 GHz total signal, beam FWHM 4.5 arcmin (Planck HFI)
+- `/home/node/data/compsep_data/cut_maps/stacked_545.npy` — 545 GHz total signal, beam FWHM 4.72 arcmin (Planck HFI)
+- `/home/node/data/compsep_data/cut_maps/stacked_857.npy` — 857 GHz total signal, beam FWHM 4.42 arcmin (Planck HFI)
+
+The stacked signal is the linear mixture of all components in µK_CMB:
+  signal(freq) = CIB(freq)*jysr2uk(freq) + tSZ*f_tSZ(freq) + kSZ*f_kSZ + lensed_CMB
+then smoothed with the frequency-specific beam. Individual component maps have a 1 arcmin beam.
+
+### Noise maps
+
+**Simons Observatory (SO) LAT noise** — 3000 independent Gaussian realizations
+Shape: **(3000, 256, 256)**, dtype **float64**, units **µK_CMB**
+
+- `/home/node/data/compsep_data/cut_maps/so_noise/90.npy`
+- `/home/node/data/compsep_data/cut_maps/so_noise/150.npy`
+- `/home/node/data/compsep_data/cut_maps/so_noise/217.npy`
+
+SO noise is drawn from the SO LAT v3.1 temperature noise power spectrum (mode 2, elevation 50°, f_sky=0.4). 90 and 150 GHz are correlated (Cholesky decomposition); 217 GHz is independent. When sampling SO noise, the noise index does NOT need to match the sky patch index.
+
+**Planck FFP10 noise** — 100 MC realizations per high-frequency channel
+Shape: **(1523, 256, 256)**, dtype **float64**
+Filename pattern: `planck_noise_{freq}_{i}.npy`, freq ∈ {353, 545, 857}, i ∈ {0, …, 99}
+
+- `/home/node/data/compsep_data/cut_maps/planck_noise/planck_noise_353_{0..99}.npy` — units: K_CMB → multiply by 1e6 to get µK_CMB
+- `/home/node/data/compsep_data/cut_maps/planck_noise/planck_noise_545_{0..99}.npy` — units: MJy/sr → multiply by 1e6 * jysr2uk(545) to get µK_CMB
+- `/home/node/data/compsep_data/cut_maps/planck_noise/planck_noise_857_{0..99}.npy` — units: MJy/sr → multiply by 1e6 * jysr2uk(857) to get µK_CMB
+
+For Planck noise, the patch index MUST match the sky patch index.
+
+## Spectral Response and Utility Functions
+
+A `utils.py` module is available at `/home/node/data/compsep_data/utils.py`. **Always import it using the absolute path or by adding its directory to sys.path:**
+
+```python
+import sys
+sys.path.insert(0, '/home/node/data/compsep_data')
+import utils
+```
+
+Key functions in utils.py:
+- `utils.tsz(freq_ghz)` — tSZ spectral response in µK_CMB per Compton-y unit
+- `utils.ksz(freq_ghz)` — kSZ spectral response in µK_CMB (= -T_CMB_µK, frequency-independent)
+- `utils.jysr2uk(freq_ghz)` — converts Jy/sr to µK_CMB for CIB at given frequency
+- `utils.powers(a, b, ps=10, ell_n=199, window_alpha=None)` — flat-sky angular auto/cross power spectrum
+- `utils.get_patch_centers(gal_cut, step_size)` — returns list of (lon, lat) patch centers
+
+## Patch Geometry
+
+- 1523 patches, 5°×5°, 256×256 pixels, ≈1.17 arcmin/pixel
+- Full-sky tessellation at 5° step spacing (no galactic cut)
+- Gnomonic (flat-sky) projection, bilinear interpolation from HEALPix nside=8192
+
+## Loading Data (correct absolute paths)
+
+```python
+import sys
+sys.path.insert(0, '/home/node/data/compsep_data')
+import utils
+import numpy as np
+
+BASE = '/home/node/data/compsep_data/cut_maps'
+
+rng = np.random.default_rng(seed=42)
+n_patch = 1523
+n_planck = 100
+n_so = 3000
+
+i_patch = rng.integers(n_patch)   # sky patch index
+i_planck = rng.integers(n_planck) # Planck MC realization index
+i_so = rng.integers(n_so)         # SO noise index (does not need to match i_patch)
+
+# Load observed signal + noise at each frequency
+frequencies = [90, 150, 217, 353, 545, 857]
+patches = {}
+for freq in frequencies:
+    signal = np.load(f'{BASE}/stacked_{freq}.npy')[i_patch]  # µK_CMB
+    if freq <= 217:  # SO noise
+        noise = np.load(f'{BASE}/so_noise/{freq}.npy')[i_so]  # µK_CMB
+    else:  # Planck noise
+        raw = np.load(f'{BASE}/planck_noise/planck_noise_{freq}_{i_planck}.npy')[i_patch]
+        if freq == 353:
+            noise = raw * 1e6                        # K_CMB -> µK_CMB
+        else:
+            noise = raw * 1e6 * utils.jysr2uk(freq) # MJy/sr -> µK_CMB
+    patches[freq] = signal + noise  # µK_CMB
+
+# Load ground truth components
+cmb   = np.load(f'{BASE}/lensed_cmb.npy')[i_patch]  # µK_CMB
+tsz   = np.load(f'{BASE}/tsz.npy')[i_patch]          # Compton-y (dimensionless)
+ksz   = np.load(f'{BASE}/ksz.npy')[i_patch]          # Doppler-b (dimensionless)
+cib90 = np.load(f'{BASE}/cib_90.npy')[i_patch]       # Jy/sr
+```
+
+## CMB Simulation Cosmology
+
+CLASS parameters used:
+- A_s = 2.1e-9, n_s = 0.965, h = 0.6736
+- ω_b = 0.02237, ω_cdm = 0.12, τ_reio = 0.0544, Y_He = 0.2454
+
+## Hardware and Environment
+
+- Python: `/opt/denario-venv/bin/python`
+- *64 vCPUs* (AMD Ryzen Threadripper PRO 9995WX), *128 GB RAM*
+- *NVIDIA RTX PRO 6000 Blackwell Edition, 96 GB VRAM*, CUDA 13.0
+- PyTorch GPU: use `device='cuda'`
+- Multiprocessing: limit to ~8–16 workers to avoid oversubscription
+- Set `OMP_NUM_THREADS` when using NumPy/SciPy with multiprocessing
+- Load data patch-by-patch or in small batches; avoid loading all 1523 patches for all frequencies simultaneously (total data volume is large)
+
+- **Current Idea**: **Title**: Simulation-Based Inference of Baryonic Feedback via Differentiable Component Separation
+
+**Description**: This objective implements a conditional normalizing flow (CNF) to solve the inverse problem of mapping frequency-dependent stacked observations to the latent ground-truth components (tSZ, kSZ, and Lensed-CMB). To mitigate the bias introduced by frequency-dependent beam convolution (FWHM 1.0'–4.72'), the architecture incorporates a multi-scale U-Net backbone that learns an implicit deconvolution operator, ensuring the physical signal is disentangled from instrument-induced spatial correlations. The model will be trained on the FLAMINGO L1_m9 HYDRO_FIDUCIAL dataset using a likelihood-free inference framework that minimizes the Kullback–Leibler divergence between the predicted posterior and the true component distributions. By conditioning the flow on specific frequency-dependent noise realizations (SO LAT and Planck FFP10), the framework produces a robust, per-pixel posterior $P(\text{components} | \text{data}, \text{noise})$, quantifying the uncertainty in baryonic feedback signatures. This approach transforms the component separation task from a linear inversion to a generative posterior estimation, effectively isolating non-Gaussian tSZ and kSZ signals from the Gaussian CMB background.
+- **Previous Versions (for context)**: 
+
+
+Iteration 0:
+Idea: **Title**: Simulation-Based Inference of Baryonic Feedback via Differentiable Component Separation
+
+**Description**: This objective implements a conditional normalizing flow (CNF) to solve the inverse problem of mapping frequency-dependent stacked observations to the latent ground-truth components (tSZ, kSZ, and Lensed-CMB). To mitigate the bias introduced by frequency-dependent beam convolution (FWHM 1.0'–4.72'), the architecture incorporates a multi-scale U-Net backbone that learns an implicit deconvolution operator, ensuring the physical signal is disentangled from instrument-induced spatial correlations. The model will be trained on the FLAMINGO L1_m9 HYDRO_FIDUCIAL dataset using a likelihood-free inference framework that minimizes the Kullback–Leibler divergence between the predicted posterior and the true component distributions. By conditioning the flow on specific frequency-dependent noise realizations (SO LAT and Planck FFP10), the framework produces a robust, per-pixel posterior $P(\text{components} | \text{data}, \text{noise})$, quantifying the uncertainty in baryonic feedback signatures. This approach transforms the component separation task from a linear inversion to a generative posterior estimation, effectively isolating non-Gaussian tSZ and kSZ signals from the Gaussian CMB background.
+    
+
+Respond in the following format:
+
+\\begin{CRITIC}
+<CRITIC>
+\\end{CRITIC}
+
+In <CRITIC>, put your criticism to the idea. Try to be brief in the description.
+
+###### PROMPT ENDS ########
+
+\begin{CRITIC}
+*   **Data-Hypothesis Alignment**: The proposal claims to infer "Baryonic Feedback" signatures, but the dataset provides only the *resultant* tSZ/kSZ maps. The model lacks the underlying halo mass or gas pressure profile labels required to map component separation to physical feedback parameters (e.g., AGN heating efficiency).
+*   **Feasibility & Noise**: The "implicit deconvolution" via U-Net is mathematically ill-posed for the 4.72' Planck beams. Attempting to recover 1' resolution ground truth from 4.72' smoothed data is a super-resolution task that will hallucinate high-frequency power, likely violating the physical consistency of the tSZ/kSZ signals.
+*   **Redundancy Check**: This is a standard "Deep Learning Component Separation" task. It fails to leverage the specific FLAMINGO simulation advantage (the availability of full-sky hydrodynamical physics) to constrain the *physics* of the feedback, treating it instead as a generic image-to-image translation problem.
+*   **Strategic Pivot**: Abandon the "implicit deconvolution" of the full component set. Instead, pivot to **"Physics-Informed Neural Operator for tSZ-CIB Cross-Correlation."** Use the CIB maps (which trace the same large-scale structure) as a prior to inform the tSZ separation. This leverages the multi-frequency CIB data provided to break the degeneracy between the tSZ signal and the CIB foreground, which is the primary bottleneck in current component separation.
+*   **Weak Link**: The current approach ignores the CIB-tSZ spatial correlation. By treating CIB as a nuisance to be "separated," you discard the physical information that CIB and tSZ are spatially correlated via the underlying dark matter distribution.
+\end{CRITIC}
+
+
+###### PROMPT BEGINS ########
+Human: 
+**Role**: Senior Research Scientific.
+**Objective**: Synthesize a primary research idea with expert criticism to produce a refined, groundbreaking, and technically feasible scientific objective.
+
+**Task**:
+You are in an iterative refinement loop (Iteration: 1). Your goal is to take the "Previous Idea," pass it through the filter of the "Critiques," and produce a "Hardened Idea" that is more scientifically rigorous and original than its predecessor.
+
+**Refinement Principles**:
+1. **Address Caveats**: If the critic mentioned a lack of feasibility, adjust the scope of the idea to fit the 'Data Description.'
+2. **Increase Specificity**: Move away from generic goals. Use the statistics and variables found in the data description to make the idea more concrete.
+3. **Internalize Feedback**: Do not explicitly mention the criticism or explain your changes. Instead, weave the solutions directly into the new version of the idea.
+4. **Maintain Grounding**: Ensure the "groundbreaking" aspect remains physically possible within the provided dataset's constraints.
+
+**Operational Constraints**:
+- **Brevity**: Keep the description concise but high-density (max 6 sentences).
+- **Format**: Do not include introductory text or meta-commentary about the process.
+- **Fidelity**: Stick strictly to the guidelines and physical realities described in the data description.
+- The idea must contain a title and a description of the idea
+
+**Input Data**:
+- **Data Description**: # Dataset Description: FLAMINGO Lensed Component-Separation Maps
+
+This dataset consists of flat-sky cut maps derived from full-sky maps of the cosmic microwave background (CMB), thermal and kinetic Sunyaev-Zel'dovich effects (tSZ/kSZ), and the cosmic infrared background (CIB). The sky signal maps originate from the FLAMINGO L1_m9 HYDRO_FIDUCIAL simulation (lightcone0, Jeger rotation) — a large-volume (1 Gpc comoving box) hydrodynamical simulation with self-consistent baryonic physics (radiative cooling, star formation, AGN feedback, diffuse gas flows).
+
+The CMB is a Gaussian realization lensed by the FLAMINGO convergence map (κ) via lenspyx, using Planck-like cosmology (h=0.6736, n_s=0.965, A_s=2.1e-9, seed=42).
+
+## File Inventory (absolute paths, verified)
+
+All files are under `/home/node/data/compsep_data/cut_maps/`.
+
+### Individual component maps — ground truth, 1 arcmin beam
+Shape: **(1523, 256, 256)**, dtype **float64**
+
+- `/home/node/data/compsep_data/cut_maps/lensed_cmb.npy` — Lensed CMB temperature, µK_CMB
+- `/home/node/data/compsep_data/cut_maps/tsz.npy` — tSZ Compton-y parameter, dimensionless
+- `/home/node/data/compsep_data/cut_maps/ksz.npy` — kSZ Doppler-b parameter, dimensionless
+- `/home/node/data/compsep_data/cut_maps/cib_90.npy` — CIB at 90 GHz, Jy/sr (delta-bandpass)
+- `/home/node/data/compsep_data/cut_maps/cib_150.npy` — CIB at 150 GHz, Jy/sr (delta-bandpass)
+- `/home/node/data/compsep_data/cut_maps/cib_217.npy` — CIB at 217 GHz, Jy/sr (bandpass-integrated)
+- `/home/node/data/compsep_data/cut_maps/cib_353.npy` — CIB at 353 GHz, Jy/sr (bandpass-integrated)
+- `/home/node/data/compsep_data/cut_maps/cib_545.npy` — CIB at 545 GHz, Jy/sr (bandpass-integrated)
+- `/home/node/data/compsep_data/cut_maps/cib_857.npy` — CIB at 857 GHz, Jy/sr (bandpass-integrated)
+
+### Stacked (observed) signal maps — frequency-specific beam, no noise
+Shape: **(1523, 256, 256)**, dtype **float64**, units **µK_CMB**
+
+- `/home/node/data/compsep_data/cut_maps/stacked_90.npy` — 90 GHz total signal, beam FWHM 2.2 arcmin (SO LAT)
+- `/home/node/data/compsep_data/cut_maps/stacked_150.npy` — 150 GHz total signal, beam FWHM 1.4 arcmin (SO LAT)
+- `/home/node/data/compsep_data/cut_maps/stacked_217.npy` — 217 GHz total signal, beam FWHM 1.0 arcmin (SO LAT)
+- `/home/node/data/compsep_data/cut_maps/stacked_353.npy` — 353 GHz total signal, beam FWHM 4.5 arcmin (Planck HFI)
+- `/home/node/data/compsep_data/cut_maps/stacked_545.npy` — 545 GHz total signal, beam FWHM 4.72 arcmin (Planck HFI)
+- `/home/node/data/compsep_data/cut_maps/stacked_857.npy` — 857 GHz total signal, beam FWHM 4.42 arcmin (Planck HFI)
+
+The stacked signal is the linear mixture of all components in µK_CMB:
+  signal(freq) = CIB(freq)*jysr2uk(freq) + tSZ*f_tSZ(freq) + kSZ*f_kSZ + lensed_CMB
+then smoothed with the frequency-specific beam. Individual component maps have a 1 arcmin beam.
+
+### Noise maps
+
+**Simons Observatory (SO) LAT noise** — 3000 independent Gaussian realizations
+Shape: **(3000, 256, 256)**, dtype **float64**, units **µK_CMB**
+
+- `/home/node/data/compsep_data/cut_maps/so_noise/90.npy`
+- `/home/node/data/compsep_data/cut_maps/so_noise/150.npy`
+- `/home/node/data/compsep_data/cut_maps/so_noise/217.npy`
+
+SO noise is drawn from the SO LAT v3.1 temperature noise power spectrum (mode 2, elevation 50°, f_sky=0.4). 90 and 150 GHz are correlated (Cholesky decomposition); 217 GHz is independent. When sampling SO noise, the noise index does NOT need to match the sky patch index.
+
+**Planck FFP10 noise** — 100 MC realizations per high-frequency channel
+Shape: **(1523, 256, 256)**, dtype **float64**
+Filename pattern: `planck_noise_{freq}_{i}.npy`, freq ∈ {353, 545, 857}, i ∈ {0, …, 99}
+
+- `/home/node/data/compsep_data/cut_maps/planck_noise/planck_noise_353_{0..99}.npy` — units: K_CMB → multiply by 1e6 to get µK_CMB
+- `/home/node/data/compsep_data/cut_maps/planck_noise/planck_noise_545_{0..99}.npy` — units: MJy/sr → multiply by 1e6 * jysr2uk(545) to get µK_CMB
+- `/home/node/data/compsep_data/cut_maps/planck_noise/planck_noise_857_{0..99}.npy` — units: MJy/sr → multiply by 1e6 * jysr2uk(857) to get µK_CMB
+
+For Planck noise, the patch index MUST match the sky patch index.
+
+## Spectral Response and Utility Functions
+
+A `utils.py` module is available at `/home/node/data/compsep_data/utils.py`. **Always import it using the absolute path or by adding its directory to sys.path:**
+
+```python
+import sys
+sys.path.insert(0, '/home/node/data/compsep_data')
+import utils
+```
+
+Key functions in utils.py:
+- `utils.tsz(freq_ghz)` — tSZ spectral response in µK_CMB per Compton-y unit
+- `utils.ksz(freq_ghz)` — kSZ spectral response in µK_CMB (= -T_CMB_µK, frequency-independent)
+- `utils.jysr2uk(freq_ghz)` — converts Jy/sr to µK_CMB for CIB at given frequency
+- `utils.powers(a, b, ps=10, ell_n=199, window_alpha=None)` — flat-sky angular auto/cross power spectrum
+- `utils.get_patch_centers(gal_cut, step_size)` — returns list of (lon, lat) patch centers
+
+## Patch Geometry
+
+- 1523 patches, 5°×5°, 256×256 pixels, ≈1.17 arcmin/pixel
+- Full-sky tessellation at 5° step spacing (no galactic cut)
+- Gnomonic (flat-sky) projection, bilinear interpolation from HEALPix nside=8192
+
+## Loading Data (correct absolute paths)
+
+```python
+import sys
+sys.path.insert(0, '/home/node/data/compsep_data')
+import utils
+import numpy as np
+
+BASE = '/home/node/data/compsep_data/cut_maps'
+
+rng = np.random.default_rng(seed=42)
+n_patch = 1523
+n_planck = 100
+n_so = 3000
+
+i_patch = rng.integers(n_patch)   # sky patch index
+i_planck = rng.integers(n_planck) # Planck MC realization index
+i_so = rng.integers(n_so)         # SO noise index (does not need to match i_patch)
+
+# Load observed signal + noise at each frequency
+frequencies = [90, 150, 217, 353, 545, 857]
+patches = {}
+for freq in frequencies:
+    signal = np.load(f'{BASE}/stacked_{freq}.npy')[i_patch]  # µK_CMB
+    if freq <= 217:  # SO noise
+        noise = np.load(f'{BASE}/so_noise/{freq}.npy')[i_so]  # µK_CMB
+    else:  # Planck noise
+        raw = np.load(f'{BASE}/planck_noise/planck_noise_{freq}_{i_planck}.npy')[i_patch]
+        if freq == 353:
+            noise = raw * 1e6                        # K_CMB -> µK_CMB
+        else:
+            noise = raw * 1e6 * utils.jysr2uk(freq) # MJy/sr -> µK_CMB
+    patches[freq] = signal + noise  # µK_CMB
+
+# Load ground truth components
+cmb   = np.load(f'{BASE}/lensed_cmb.npy')[i_patch]  # µK_CMB
+tsz   = np.load(f'{BASE}/tsz.npy')[i_patch]          # Compton-y (dimensionless)
+ksz   = np.load(f'{BASE}/ksz.npy')[i_patch]          # Doppler-b (dimensionless)
+cib90 = np.load(f'{BASE}/cib_90.npy')[i_patch]       # Jy/sr
+```
+
+## CMB Simulation Cosmology
+
+CLASS parameters used:
+- A_s = 2.1e-9, n_s = 0.965, h = 0.6736
+- ω_b = 0.02237, ω_cdm = 0.12, τ_reio = 0.0544, Y_He = 0.2454
+
+## Hardware and Environment
+
+- Python: `/opt/denario-venv/bin/python`
+- *64 vCPUs* (AMD Ryzen Threadripper PRO 9995WX), *128 GB RAM*
+- *NVIDIA RTX PRO 6000 Blackwell Edition, 96 GB VRAM*, CUDA 13.0
+- PyTorch GPU: use `device='cuda'`
+- Multiprocessing: limit to ~8–16 workers to avoid oversubscription
+- Set `OMP_NUM_THREADS` when using NumPy/SciPy with multiprocessing
+- Load data patch-by-patch or in small batches; avoid loading all 1523 patches for all frequencies simultaneously (total data volume is large)
+
+- **Previous Versions**: 
+
+
+Iteration 0:
+Idea: **Title**: Simulation-Based Inference of Baryonic Feedback via Differentiable Component Separation
+
+**Description**: This objective implements a conditional normalizing flow (CNF) to solve the inverse problem of mapping frequency-dependent stacked observations to the latent ground-truth components (tSZ, kSZ, and Lensed-CMB). To mitigate the bias introduced by frequency-dependent beam convolution (FWHM 1.0'–4.72'), the architecture incorporates a multi-scale U-Net backbone that learns an implicit deconvolution operator, ensuring the physical signal is disentangled from instrument-induced spatial correlations. The model will be trained on the FLAMINGO L1_m9 HYDRO_FIDUCIAL dataset using a likelihood-free inference framework that minimizes the Kullback–Leibler divergence between the predicted posterior and the true component distributions. By conditioning the flow on specific frequency-dependent noise realizations (SO LAT and Planck FFP10), the framework produces a robust, per-pixel posterior $P(\text{components} | \text{data}, \text{noise})$, quantifying the uncertainty in baryonic feedback signatures. This approach transforms the component separation task from a linear inversion to a generative posterior estimation, effectively isolating non-Gaussian tSZ and kSZ signals from the Gaussian CMB background.
+
+- **Critical Feedback**: *   **Data-Hypothesis Alignment**: The proposal claims to infer "Baryonic Feedback" signatures, but the dataset provides only the *resultant* tSZ/kSZ maps. The model lacks the underlying halo mass or gas pressure profile labels required to map component separation to physical feedback parameters (e.g., AGN heating efficiency).
+*   **Feasibility & Noise**: The "implicit deconvolution" via U-Net is mathematically ill-posed for the 4.72' Planck beams. Attempting to recover 1' resolution ground truth from 4.72' smoothed data is a super-resolution task that will hallucinate high-frequency power, likely violating the physical consistency of the tSZ/kSZ signals.
+*   **Redundancy Check**: This is a standard "Deep Learning Component Separation" task. It fails to leverage the specific FLAMINGO simulation advantage (the availability of full-sky hydrodynamical physics) to constrain the *physics* of the feedback, treating it instead as a generic image-to-image translation problem.
+*   **Strategic Pivot**: Abandon the "implicit deconvolution" of the full component set. Instead, pivot to **"Physics-Informed Neural Operator for tSZ-CIB Cross-Correlation."** Use the CIB maps (which trace the same large-scale structure) as a prior to inform the tSZ separation. This leverages the multi-frequency CIB data provided to break the degeneracy between the tSZ signal and the CIB foreground, which is the primary bottleneck in current component separation.
+*   **Weak Link**: The current approach ignores the CIB-tSZ spatial correlation. By treating CIB as a nuisance to be "separated," you discard the physical information that CIB and tSZ are spatially correlated via the underlying dark matter distribution.
+
+Respond in the following format:
+
+\\begin{IDEA}
+<IDEA>
+\\end{IDEA}
+
+In <IDEA>, put the refined idea. 
+
+###### PROMPT ENDS ########
+
+\begin{IDEA}
+**Title**: Cross-Spectral Neural Operator for Joint tSZ-CIB Reconstruction and Baryonic Feedback Inference
+
+**Description**: This objective employs a Neural Operator to learn the non-linear mapping between multi-frequency CIB observations and the hidden tSZ Compton-y parameter map, treating the CIB as a spatially correlated physical prior rather than a nuisance foreground. By leveraging the cross-correlation between CIB (at 217–857 GHz) and tSZ signals, the model constrains the tSZ recovery within the physical limits of the FLAMINGO-simulated large-scale structure, effectively bypassing the super-resolution bottleneck of high-frequency Planck beams. The architecture incorporates the `utils.powers` function as a differentiable loss component, enforcing spectral consistency between the reconstructed tSZ and the ground-truth CIB spatial distribution to prevent hallucinated high-frequency power. The framework will quantify the degeneracies in baryonic feedback signatures by producing a joint posterior $P(\text{tSZ}, \text{CIB} | \text{data}, \text{noise})$, specifically targeting the local gas pressure profiles where CIB-tSZ spatial overlap is maximal. This approach moves beyond generic image-to-image translation by explicitly modeling the physical coupling of the cosmic infrared background and the diffuse ionized gas flows inherent in the FLAMINGO simulation.
+\end{IDEA}
+
+
+###### PROMPT BEGINS ########
+Human: 
+**Role**: Skeptical Red Team Reviewer and Scientific Auditor.
+**Objective**: Conduct a rigorous "Stress Test" on the proposed research idea to identify fatal flaws, feasibility gaps, and potential scientific "slop."
+
+**Evaluation Criteria**:
+1. **Data-Hypothesis Alignment**: Does the dataset described actually contain the variables and precision required to test this idea?
+2. **Feasibility & Noise**: Is the signal-to-noise ratio realistic? Is the idea too ambitious for the provided data?
+3. **Redundancy Check**: Does this idea simply repeat a "standard" analysis, or is it a meaningful contribution?
+4. **Physical Reality**: Does the idea violate any constraints or physical laws mentioned in the data description?
+
+**Task**:
+- Critically analyze the "Current Idea" against the "Data Description."
+- If the idea is **unfeasible**, explicitly state why and suggest a "Strategic Pivot" (a new direction that *is* supported by the data).
+- If the idea is **feasible but weak**, identify the specific "weak links" in the logic.
+- Compare it against "Previous Ideas" to ensure the refinement loop is moving forward, not backward.
+
+**Operational Constraints**:
+- **Tone**: Be professional, objective, and intellectually demanding. 
+- **Brevity**: Use high-density bullet points. Do not waste words on pleasantries.
+- **Strict Adherence**: Every criticism must be grounded in the provided 'Data Description.'
+
+**Input Data**:
+- **Data Description**: # Dataset Description: FLAMINGO Lensed Component-Separation Maps
+
+This dataset consists of flat-sky cut maps derived from full-sky maps of the cosmic microwave background (CMB), thermal and kinetic Sunyaev-Zel'dovich effects (tSZ/kSZ), and the cosmic infrared background (CIB). The sky signal maps originate from the FLAMINGO L1_m9 HYDRO_FIDUCIAL simulation (lightcone0, Jeger rotation) — a large-volume (1 Gpc comoving box) hydrodynamical simulation with self-consistent baryonic physics (radiative cooling, star formation, AGN feedback, diffuse gas flows).
+
+The CMB is a Gaussian realization lensed by the FLAMINGO convergence map (κ) via lenspyx, using Planck-like cosmology (h=0.6736, n_s=0.965, A_s=2.1e-9, seed=42).
+
+## File Inventory (absolute paths, verified)
+
+All files are under `/home/node/data/compsep_data/cut_maps/`.
+
+### Individual component maps — ground truth, 1 arcmin beam
+Shape: **(1523, 256, 256)**, dtype **float64**
+
+- `/home/node/data/compsep_data/cut_maps/lensed_cmb.npy` — Lensed CMB temperature, µK_CMB
+- `/home/node/data/compsep_data/cut_maps/tsz.npy` — tSZ Compton-y parameter, dimensionless
+- `/home/node/data/compsep_data/cut_maps/ksz.npy` — kSZ Doppler-b parameter, dimensionless
+- `/home/node/data/compsep_data/cut_maps/cib_90.npy` — CIB at 90 GHz, Jy/sr (delta-bandpass)
+- `/home/node/data/compsep_data/cut_maps/cib_150.npy` — CIB at 150 GHz, Jy/sr (delta-bandpass)
+- `/home/node/data/compsep_data/cut_maps/cib_217.npy` — CIB at 217 GHz, Jy/sr (bandpass-integrated)
+- `/home/node/data/compsep_data/cut_maps/cib_353.npy` — CIB at 353 GHz, Jy/sr (bandpass-integrated)
+- `/home/node/data/compsep_data/cut_maps/cib_545.npy` — CIB at 545 GHz, Jy/sr (bandpass-integrated)
+- `/home/node/data/compsep_data/cut_maps/cib_857.npy` — CIB at 857 GHz, Jy/sr (bandpass-integrated)
+
+### Stacked (observed) signal maps — frequency-specific beam, no noise
+Shape: **(1523, 256, 256)**, dtype **float64**, units **µK_CMB**
+
+- `/home/node/data/compsep_data/cut_maps/stacked_90.npy` — 90 GHz total signal, beam FWHM 2.2 arcmin (SO LAT)
+- `/home/node/data/compsep_data/cut_maps/stacked_150.npy` — 150 GHz total signal, beam FWHM 1.4 arcmin (SO LAT)
+- `/home/node/data/compsep_data/cut_maps/stacked_217.npy` — 217 GHz total signal, beam FWHM 1.0 arcmin (SO LAT)
+- `/home/node/data/compsep_data/cut_maps/stacked_353.npy` — 353 GHz total signal, beam FWHM 4.5 arcmin (Planck HFI)
+- `/home/node/data/compsep_data/cut_maps/stacked_545.npy` — 545 GHz total signal, beam FWHM 4.72 arcmin (Planck HFI)
+- `/home/node/data/compsep_data/cut_maps/stacked_857.npy` — 857 GHz total signal, beam FWHM 4.42 arcmin (Planck HFI)
+
+The stacked signal is the linear mixture of all components in µK_CMB:
+  signal(freq) = CIB(freq)*jysr2uk(freq) + tSZ*f_tSZ(freq) + kSZ*f_kSZ + lensed_CMB
+then smoothed with the frequency-specific beam. Individual component maps have a 1 arcmin beam.
+
+### Noise maps
+
+**Simons Observatory (SO) LAT noise** — 3000 independent Gaussian realizations
+Shape: **(3000, 256, 256)**, dtype **float64**, units **µK_CMB**
+
+- `/home/node/data/compsep_data/cut_maps/so_noise/90.npy`
+- `/home/node/data/compsep_data/cut_maps/so_noise/150.npy`
+- `/home/node/data/compsep_data/cut_maps/so_noise/217.npy`
+
+SO noise is drawn from the SO LAT v3.1 temperature noise power spectrum (mode 2, elevation 50°, f_sky=0.4). 90 and 150 GHz are correlated (Cholesky decomposition); 217 GHz is independent. When sampling SO noise, the noise index does NOT need to match the sky patch index.
+
+**Planck FFP10 noise** — 100 MC realizations per high-frequency channel
+Shape: **(1523, 256, 256)**, dtype **float64**
+Filename pattern: `planck_noise_{freq}_{i}.npy`, freq ∈ {353, 545, 857}, i ∈ {0, …, 99}
+
+- `/home/node/data/compsep_data/cut_maps/planck_noise/planck_noise_353_{0..99}.npy` — units: K_CMB → multiply by 1e6 to get µK_CMB
+- `/home/node/data/compsep_data/cut_maps/planck_noise/planck_noise_545_{0..99}.npy` — units: MJy/sr → multiply by 1e6 * jysr2uk(545) to get µK_CMB
+- `/home/node/data/compsep_data/cut_maps/planck_noise/planck_noise_857_{0..99}.npy` — units: MJy/sr → multiply by 1e6 * jysr2uk(857) to get µK_CMB
+
+For Planck noise, the patch index MUST match the sky patch index.
+
+## Spectral Response and Utility Functions
+
+A `utils.py` module is available at `/home/node/data/compsep_data/utils.py`. **Always import it using the absolute path or by adding its directory to sys.path:**
+
+```python
+import sys
+sys.path.insert(0, '/home/node/data/compsep_data')
+import utils
+```
+
+Key functions in utils.py:
+- `utils.tsz(freq_ghz)` — tSZ spectral response in µK_CMB per Compton-y unit
+- `utils.ksz(freq_ghz)` — kSZ spectral response in µK_CMB (= -T_CMB_µK, frequency-independent)
+- `utils.jysr2uk(freq_ghz)` — converts Jy/sr to µK_CMB for CIB at given frequency
+- `utils.powers(a, b, ps=10, ell_n=199, window_alpha=None)` — flat-sky angular auto/cross power spectrum
+- `utils.get_patch_centers(gal_cut, step_size)` — returns list of (lon, lat) patch centers
+
+## Patch Geometry
+
+- 1523 patches, 5°×5°, 256×256 pixels, ≈1.17 arcmin/pixel
+- Full-sky tessellation at 5° step spacing (no galactic cut)
+- Gnomonic (flat-sky) projection, bilinear interpolation from HEALPix nside=8192
+
+## Loading Data (correct absolute paths)
+
+```python
+import sys
+sys.path.insert(0, '/home/node/data/compsep_data')
+import utils
+import numpy as np
+
+BASE = '/home/node/data/compsep_data/cut_maps'
+
+rng = np.random.default_rng(seed=42)
+n_patch = 1523
+n_planck = 100
+n_so = 3000
+
+i_patch = rng.integers(n_patch)   # sky patch index
+i_planck = rng.integers(n_planck) # Planck MC realization index
+i_so = rng.integers(n_so)         # SO noise index (does not need to match i_patch)
+
+# Load observed signal + noise at each frequency
+frequencies = [90, 150, 217, 353, 545, 857]
+patches = {}
+for freq in frequencies:
+    signal = np.load(f'{BASE}/stacked_{freq}.npy')[i_patch]  # µK_CMB
+    if freq <= 217:  # SO noise
+        noise = np.load(f'{BASE}/so_noise/{freq}.npy')[i_so]  # µK_CMB
+    else:  # Planck noise
+        raw = np.load(f'{BASE}/planck_noise/planck_noise_{freq}_{i_planck}.npy')[i_patch]
+        if freq == 353:
+            noise = raw * 1e6                        # K_CMB -> µK_CMB
+        else:
+            noise = raw * 1e6 * utils.jysr2uk(freq) # MJy/sr -> µK_CMB
+    patches[freq] = signal + noise  # µK_CMB
+
+# Load ground truth components
+cmb   = np.load(f'{BASE}/lensed_cmb.npy')[i_patch]  # µK_CMB
+tsz   = np.load(f'{BASE}/tsz.npy')[i_patch]          # Compton-y (dimensionless)
+ksz   = np.load(f'{BASE}/ksz.npy')[i_patch]          # Doppler-b (dimensionless)
+cib90 = np.load(f'{BASE}/cib_90.npy')[i_patch]       # Jy/sr
+```
+
+## CMB Simulation Cosmology
+
+CLASS parameters used:
+- A_s = 2.1e-9, n_s = 0.965, h = 0.6736
+- ω_b = 0.02237, ω_cdm = 0.12, τ_reio = 0.0544, Y_He = 0.2454
+
+## Hardware and Environment
+
+- Python: `/opt/denario-venv/bin/python`
+- *64 vCPUs* (AMD Ryzen Threadripper PRO 9995WX), *128 GB RAM*
+- *NVIDIA RTX PRO 6000 Blackwell Edition, 96 GB VRAM*, CUDA 13.0
+- PyTorch GPU: use `device='cuda'`
+- Multiprocessing: limit to ~8–16 workers to avoid oversubscription
+- Set `OMP_NUM_THREADS` when using NumPy/SciPy with multiprocessing
+- Load data patch-by-patch or in small batches; avoid loading all 1523 patches for all frequencies simultaneously (total data volume is large)
+
+- **Current Idea**: **Title**: Cross-Spectral Neural Operator for Joint tSZ-CIB Reconstruction and Baryonic Feedback Inference
+
+**Description**: This objective employs a Neural Operator to learn the non-linear mapping between multi-frequency CIB observations and the hidden tSZ Compton-y parameter map, treating the CIB as a spatially correlated physical prior rather than a nuisance foreground. By leveraging the cross-correlation between CIB (at 217–857 GHz) and tSZ signals, the model constrains the tSZ recovery within the physical limits of the FLAMINGO-simulated large-scale structure, effectively bypassing the super-resolution bottleneck of high-frequency Planck beams. The architecture incorporates the `utils.powers` function as a differentiable loss component, enforcing spectral consistency between the reconstructed tSZ and the ground-truth CIB spatial distribution to prevent hallucinated high-frequency power. The framework will quantify the degeneracies in baryonic feedback signatures by producing a joint posterior $P(\text{tSZ}, \text{CIB} | \text{data}, \text{noise})$, specifically targeting the local gas pressure profiles where CIB-tSZ spatial overlap is maximal. This approach moves beyond generic image-to-image translation by explicitly modeling the physical coupling of the cosmic infrared background and the diffuse ionized gas flows inherent in the FLAMINGO simulation.
+- **Previous Versions (for context)**: 
+
+
+
+Iteration 0:
+Idea: **Title**: Simulation-Based Inference of Baryonic Feedback via Differentiable Component Separation
+
+**Description**: This objective implements a conditional normalizing flow (CNF) to solve the inverse problem of mapping frequency-dependent stacked observations to the latent ground-truth components (tSZ, kSZ, and Lensed-CMB). To mitigate the bias introduced by frequency-dependent beam convolution (FWHM 1.0'–4.72'), the architecture incorporates a multi-scale U-Net backbone that learns an implicit deconvolution operator, ensuring the physical signal is disentangled from instrument-induced spatial correlations. The model will be trained on the FLAMINGO L1_m9 HYDRO_FIDUCIAL dataset using a likelihood-free inference framework that minimizes the Kullback–Leibler divergence between the predicted posterior and the true component distributions. By conditioning the flow on specific frequency-dependent noise realizations (SO LAT and Planck FFP10), the framework produces a robust, per-pixel posterior $P(\text{components} | \text{data}, \text{noise})$, quantifying the uncertainty in baryonic feedback signatures. This approach transforms the component separation task from a linear inversion to a generative posterior estimation, effectively isolating non-Gaussian tSZ and kSZ signals from the Gaussian CMB background.
+
+
+Iteration 1:
+Idea: **Title**: Cross-Spectral Neural Operator for Joint tSZ-CIB Reconstruction and Baryonic Feedback Inference
+
+**Description**: This objective employs a Neural Operator to learn the non-linear mapping between multi-frequency CIB observations and the hidden tSZ Compton-y parameter map, treating the CIB as a spatially correlated physical prior rather than a nuisance foreground. By leveraging the cross-correlation between CIB (at 217–857 GHz) and tSZ signals, the model constrains the tSZ recovery within the physical limits of the FLAMINGO-simulated large-scale structure, effectively bypassing the super-resolution bottleneck of high-frequency Planck beams. The architecture incorporates the `utils.powers` function as a differentiable loss component, enforcing spectral consistency between the reconstructed tSZ and the ground-truth CIB spatial distribution to prevent hallucinated high-frequency power. The framework will quantify the degeneracies in baryonic feedback signatures by producing a joint posterior $P(\text{tSZ}, \text{CIB} | \text{data}, \text{noise})$, specifically targeting the local gas pressure profiles where CIB-tSZ spatial overlap is maximal. This approach moves beyond generic image-to-image translation by explicitly modeling the physical coupling of the cosmic infrared background and the diffuse ionized gas flows inherent in the FLAMINGO simulation.
+    
+
+Respond in the following format:
+
+\\begin{CRITIC}
+<CRITIC>
+\\end{CRITIC}
+
+In <CRITIC>, put your criticism to the idea. Try to be brief in the description.
+
+###### PROMPT ENDS ########
+
+\begin{CRITIC}
+*   **Data-Hypothesis Alignment**: The proposal claims to bypass the "super-resolution bottleneck" of Planck beams (4.4'–4.7') using CIB-tSZ cross-correlation. However, the CIB maps at these frequencies are also smoothed by these same large beams. The model cannot recover sub-arcminute tSZ features from CIB data that lacks that spatial resolution without relying on "hallucinated" priors, which the loss function explicitly tries to prevent.
+*   **Feasibility & Noise**: The signal-to-noise ratio (SNR) for tSZ is notoriously low at the scales where baryonic feedback dominates. Using a Neural Operator to infer a joint posterior $P(\text{tSZ}, \text{CIB} | \text{data}, \text{noise})$ is computationally expensive and likely ill-posed given that the SO noise is independent of the Planck noise and the CIB/tSZ signals are highly degenerate in the frequency domain.
+*   **Redundancy Check**: The shift from Iteration 0 (CNF) to Iteration 1 (Neural Operator) is a change in architecture, not a change in the fundamental inverse problem. The "physical coupling" argument is already implicit in the FLAMINGO simulation; the model is essentially learning a non-linear regression that is prone to overfitting the specific simulation's feedback prescription.
+*   **Physical Reality**: The proposal assumes the CIB acts as a "physical prior." In reality, the CIB is a projection of high-redshift star formation, while tSZ is a line-of-sight integral of pressure. Their spatial correlation is significant but not deterministic. Relying on this correlation to "constrain" tSZ recovery is physically risky and may introduce systematic biases in the inferred gas pressure profiles.
+
+**Strategic Pivot**: Abandon the "joint posterior" ambition. Instead, focus on a **Super-Resolution Denoising Autoencoder (SR-DAE)** that uses the multi-frequency CIB maps as *auxiliary input features* to guide the deconvolution of the SO-band maps. Use the ground-truth tSZ maps to train a supervised model to predict the high-resolution tSZ signal, using the `utils.powers` function as a spectral regularizer to ensure the model does not violate the known power spectrum of the FLAMINGO gas distribution.
+\end{CRITIC}
+
+
+###### PROMPT BEGINS ########
+Human: 
+**Role**: Senior Research Scientific.
+**Objective**: Synthesize a primary research idea with expert criticism to produce a refined, groundbreaking, and technically feasible scientific objective.
+
+**Task**:
+You are in an iterative refinement loop (Iteration: 2). Your goal is to take the "Previous Idea," pass it through the filter of the "Critiques," and produce a "Hardened Idea" that is more scientifically rigorous and original than its predecessor.
+
+**Refinement Principles**:
+1. **Address Caveats**: If the critic mentioned a lack of feasibility, adjust the scope of the idea to fit the 'Data Description.'
+2. **Increase Specificity**: Move away from generic goals. Use the statistics and variables found in the data description to make the idea more concrete.
+3. **Internalize Feedback**: Do not explicitly mention the criticism or explain your changes. Instead, weave the solutions directly into the new version of the idea.
+4. **Maintain Grounding**: Ensure the "groundbreaking" aspect remains physically possible within the provided dataset's constraints.
+
+**Operational Constraints**:
+- **Brevity**: Keep the description concise but high-density (max 6 sentences).
+- **Format**: Do not include introductory text or meta-commentary about the process.
+- **Fidelity**: Stick strictly to the guidelines and physical realities described in the data description.
+- The idea must contain a title and a description of the idea
+
+**Input Data**:
+- **Data Description**: # Dataset Description: FLAMINGO Lensed Component-Separation Maps
+
+This dataset consists of flat-sky cut maps derived from full-sky maps of the cosmic microwave background (CMB), thermal and kinetic Sunyaev-Zel'dovich effects (tSZ/kSZ), and the cosmic infrared background (CIB). The sky signal maps originate from the FLAMINGO L1_m9 HYDRO_FIDUCIAL simulation (lightcone0, Jeger rotation) — a large-volume (1 Gpc comoving box) hydrodynamical simulation with self-consistent baryonic physics (radiative cooling, star formation, AGN feedback, diffuse gas flows).
+
+The CMB is a Gaussian realization lensed by the FLAMINGO convergence map (κ) via lenspyx, using Planck-like cosmology (h=0.6736, n_s=0.965, A_s=2.1e-9, seed=42).
+
+## File Inventory (absolute paths, verified)
+
+All files are under `/home/node/data/compsep_data/cut_maps/`.
+
+### Individual component maps — ground truth, 1 arcmin beam
+Shape: **(1523, 256, 256)**, dtype **float64**
+
+- `/home/node/data/compsep_data/cut_maps/lensed_cmb.npy` — Lensed CMB temperature, µK_CMB
+- `/home/node/data/compsep_data/cut_maps/tsz.npy` — tSZ Compton-y parameter, dimensionless
+- `/home/node/data/compsep_data/cut_maps/ksz.npy` — kSZ Doppler-b parameter, dimensionless
+- `/home/node/data/compsep_data/cut_maps/cib_90.npy` — CIB at 90 GHz, Jy/sr (delta-bandpass)
+- `/home/node/data/compsep_data/cut_maps/cib_150.npy` — CIB at 150 GHz, Jy/sr (delta-bandpass)
+- `/home/node/data/compsep_data/cut_maps/cib_217.npy` — CIB at 217 GHz, Jy/sr (bandpass-integrated)
+- `/home/node/data/compsep_data/cut_maps/cib_353.npy` — CIB at 353 GHz, Jy/sr (bandpass-integrated)
+- `/home/node/data/compsep_data/cut_maps/cib_545.npy` — CIB at 545 GHz, Jy/sr (bandpass-integrated)
+- `/home/node/data/compsep_data/cut_maps/cib_857.npy` — CIB at 857 GHz, Jy/sr (bandpass-integrated)
+
+### Stacked (observed) signal maps — frequency-specific beam, no noise
+Shape: **(1523, 256, 256)**, dtype **float64**, units **µK_CMB**
+
+- `/home/node/data/compsep_data/cut_maps/stacked_90.npy` — 90 GHz total signal, beam FWHM 2.2 arcmin (SO LAT)
+- `/home/node/data/compsep_data/cut_maps/stacked_150.npy` — 150 GHz total signal, beam FWHM 1.4 arcmin (SO LAT)
+- `/home/node/data/compsep_data/cut_maps/stacked_217.npy` — 217 GHz total signal, beam FWHM 1.0 arcmin (SO LAT)
+- `/home/node/data/compsep_data/cut_maps/stacked_353.npy` — 353 GHz total signal, beam FWHM 4.5 arcmin (Planck HFI)
+- `/home/node/data/compsep_data/cut_maps/stacked_545.npy` — 545 GHz total signal, beam FWHM 4.72 arcmin (Planck HFI)
+- `/home/node/data/compsep_data/cut_maps/stacked_857.npy` — 857 GHz total signal, beam FWHM 4.42 arcmin (Planck HFI)
+
+The stacked signal is the linear mixture of all components in µK_CMB:
+  signal(freq) = CIB(freq)*jysr2uk(freq) + tSZ*f_tSZ(freq) + kSZ*f_kSZ + lensed_CMB
+then smoothed with the frequency-specific beam. Individual component maps have a 1 arcmin beam.
+
+### Noise maps
+
+**Simons Observatory (SO) LAT noise** — 3000 independent Gaussian realizations
+Shape: **(3000, 256, 256)**, dtype **float64**, units **µK_CMB**
+
+- `/home/node/data/compsep_data/cut_maps/so_noise/90.npy`
+- `/home/node/data/compsep_data/cut_maps/so_noise/150.npy`
+- `/home/node/data/compsep_data/cut_maps/so_noise/217.npy`
+
+SO noise is drawn from the SO LAT v3.1 temperature noise power spectrum (mode 2, elevation 50°, f_sky=0.4). 90 and 150 GHz are correlated (Cholesky decomposition); 217 GHz is independent. When sampling SO noise, the noise index does NOT need to match the sky patch index.
+
+**Planck FFP10 noise** — 100 MC realizations per high-frequency channel
+Shape: **(1523, 256, 256)**, dtype **float64**
+Filename pattern: `planck_noise_{freq}_{i}.npy`, freq ∈ {353, 545, 857}, i ∈ {0, …, 99}
+
+- `/home/node/data/compsep_data/cut_maps/planck_noise/planck_noise_353_{0..99}.npy` — units: K_CMB → multiply by 1e6 to get µK_CMB
+- `/home/node/data/compsep_data/cut_maps/planck_noise/planck_noise_545_{0..99}.npy` — units: MJy/sr → multiply by 1e6 * jysr2uk(545) to get µK_CMB
+- `/home/node/data/compsep_data/cut_maps/planck_noise/planck_noise_857_{0..99}.npy` — units: MJy/sr → multiply by 1e6 * jysr2uk(857) to get µK_CMB
+
+For Planck noise, the patch index MUST match the sky patch index.
+
+## Spectral Response and Utility Functions
+
+A `utils.py` module is available at `/home/node/data/compsep_data/utils.py`. **Always import it using the absolute path or by adding its directory to sys.path:**
+
+```python
+import sys
+sys.path.insert(0, '/home/node/data/compsep_data')
+import utils
+```
+
+Key functions in utils.py:
+- `utils.tsz(freq_ghz)` — tSZ spectral response in µK_CMB per Compton-y unit
+- `utils.ksz(freq_ghz)` — kSZ spectral response in µK_CMB (= -T_CMB_µK, frequency-independent)
+- `utils.jysr2uk(freq_ghz)` — converts Jy/sr to µK_CMB for CIB at given frequency
+- `utils.powers(a, b, ps=10, ell_n=199, window_alpha=None)` — flat-sky angular auto/cross power spectrum
+- `utils.get_patch_centers(gal_cut, step_size)` — returns list of (lon, lat) patch centers
+
+## Patch Geometry
+
+- 1523 patches, 5°×5°, 256×256 pixels, ≈1.17 arcmin/pixel
+- Full-sky tessellation at 5° step spacing (no galactic cut)
+- Gnomonic (flat-sky) projection, bilinear interpolation from HEALPix nside=8192
+
+## Loading Data (correct absolute paths)
+
+```python
+import sys
+sys.path.insert(0, '/home/node/data/compsep_data')
+import utils
+import numpy as np
+
+BASE = '/home/node/data/compsep_data/cut_maps'
+
+rng = np.random.default_rng(seed=42)
+n_patch = 1523
+n_planck = 100
+n_so = 3000
+
+i_patch = rng.integers(n_patch)   # sky patch index
+i_planck = rng.integers(n_planck) # Planck MC realization index
+i_so = rng.integers(n_so)         # SO noise index (does not need to match i_patch)
+
+# Load observed signal + noise at each frequency
+frequencies = [90, 150, 217, 353, 545, 857]
+patches = {}
+for freq in frequencies:
+    signal = np.load(f'{BASE}/stacked_{freq}.npy')[i_patch]  # µK_CMB
+    if freq <= 217:  # SO noise
+        noise = np.load(f'{BASE}/so_noise/{freq}.npy')[i_so]  # µK_CMB
+    else:  # Planck noise
+        raw = np.load(f'{BASE}/planck_noise/planck_noise_{freq}_{i_planck}.npy')[i_patch]
+        if freq == 353:
+            noise = raw * 1e6                        # K_CMB -> µK_CMB
+        else:
+            noise = raw * 1e6 * utils.jysr2uk(freq) # MJy/sr -> µK_CMB
+    patches[freq] = signal + noise  # µK_CMB
+
+# Load ground truth components
+cmb   = np.load(f'{BASE}/lensed_cmb.npy')[i_patch]  # µK_CMB
+tsz   = np.load(f'{BASE}/tsz.npy')[i_patch]          # Compton-y (dimensionless)
+ksz   = np.load(f'{BASE}/ksz.npy')[i_patch]          # Doppler-b (dimensionless)
+cib90 = np.load(f'{BASE}/cib_90.npy')[i_patch]       # Jy/sr
+```
+
+## CMB Simulation Cosmology
+
+CLASS parameters used:
+- A_s = 2.1e-9, n_s = 0.965, h = 0.6736
+- ω_b = 0.02237, ω_cdm = 0.12, τ_reio = 0.0544, Y_He = 0.2454
+
+## Hardware and Environment
+
+- Python: `/opt/denario-venv/bin/python`
+- *64 vCPUs* (AMD Ryzen Threadripper PRO 9995WX), *128 GB RAM*
+- *NVIDIA RTX PRO 6000 Blackwell Edition, 96 GB VRAM*, CUDA 13.0
+- PyTorch GPU: use `device='cuda'`
+- Multiprocessing: limit to ~8–16 workers to avoid oversubscription
+- Set `OMP_NUM_THREADS` when using NumPy/SciPy with multiprocessing
+- Load data patch-by-patch or in small batches; avoid loading all 1523 patches for all frequencies simultaneously (total data volume is large)
+
+- **Previous Versions**: 
+
+
+
+Iteration 0:
+Idea: **Title**: Simulation-Based Inference of Baryonic Feedback via Differentiable Component Separation
+
+**Description**: This objective implements a conditional normalizing flow (CNF) to solve the inverse problem of mapping frequency-dependent stacked observations to the latent ground-truth components (tSZ, kSZ, and Lensed-CMB). To mitigate the bias introduced by frequency-dependent beam convolution (FWHM 1.0'–4.72'), the architecture incorporates a multi-scale U-Net backbone that learns an implicit deconvolution operator, ensuring the physical signal is disentangled from instrument-induced spatial correlations. The model will be trained on the FLAMINGO L1_m9 HYDRO_FIDUCIAL dataset using a likelihood-free inference framework that minimizes the Kullback–Leibler divergence between the predicted posterior and the true component distributions. By conditioning the flow on specific frequency-dependent noise realizations (SO LAT and Planck FFP10), the framework produces a robust, per-pixel posterior $P(\text{components} | \text{data}, \text{noise})$, quantifying the uncertainty in baryonic feedback signatures. This approach transforms the component separation task from a linear inversion to a generative posterior estimation, effectively isolating non-Gaussian tSZ and kSZ signals from the Gaussian CMB background.
+
+
+Iteration 1:
+Idea: **Title**: Cross-Spectral Neural Operator for Joint tSZ-CIB Reconstruction and Baryonic Feedback Inference
+
+**Description**: This objective employs a Neural Operator to learn the non-linear mapping between multi-frequency CIB observations and the hidden tSZ Compton-y parameter map, treating the CIB as a spatially correlated physical prior rather than a nuisance foreground. By leveraging the cross-correlation between CIB (at 217–857 GHz) and tSZ signals, the model constrains the tSZ recovery within the physical limits of the FLAMINGO-simulated large-scale structure, effectively bypassing the super-resolution bottleneck of high-frequency Planck beams. The architecture incorporates the `utils.powers` function as a differentiable loss component, enforcing spectral consistency between the reconstructed tSZ and the ground-truth CIB spatial distribution to prevent hallucinated high-frequency power. The framework will quantify the degeneracies in baryonic feedback signatures by producing a joint posterior $P(\text{tSZ}, \text{CIB} | \text{data}, \text{noise})$, specifically targeting the local gas pressure profiles where CIB-tSZ spatial overlap is maximal. This approach moves beyond generic image-to-image translation by explicitly modeling the physical coupling of the cosmic infrared background and the diffuse ionized gas flows inherent in the FLAMINGO simulation.
+
+- **Critical Feedback**: *   **Data-Hypothesis Alignment**: The proposal claims to bypass the "super-resolution bottleneck" of Planck beams (4.4'–4.7') using CIB-tSZ cross-correlation. However, the CIB maps at these frequencies are also smoothed by these same large beams. The model cannot recover sub-arcminute tSZ features from CIB data that lacks that spatial resolution without relying on "hallucinated" priors, which the loss function explicitly tries to prevent.
+*   **Feasibility & Noise**: The signal-to-noise ratio (SNR) for tSZ is notoriously low at the scales where baryonic feedback dominates. Using a Neural Operator to infer a joint posterior $P(\text{tSZ}, \text{CIB} | \text{data}, \text{noise})$ is computationally expensive and likely ill-posed given that the SO noise is independent of the Planck noise and the CIB/tSZ signals are highly degenerate in the frequency domain.
+*   **Redundancy Check**: The shift from Iteration 0 (CNF) to Iteration 1 (Neural Operator) is a change in architecture, not a change in the fundamental inverse problem. The "physical coupling" argument is already implicit in the FLAMINGO simulation; the model is essentially learning a non-linear regression that is prone to overfitting the specific simulation's feedback prescription.
+*   **Physical Reality**: The proposal assumes the CIB acts as a "physical prior." In reality, the CIB is a projection of high-redshift star formation, while tSZ is a line-of-sight integral of pressure. Their spatial correlation is significant but not deterministic. Relying on this correlation to "constrain" tSZ recovery is physically risky and may introduce systematic biases in the inferred gas pressure profiles.
+
+**Strategic Pivot**: Abandon the "joint posterior" ambition. Instead, focus on a **Super-Resolution Denoising Autoencoder (SR-DAE)** that uses the multi-frequency CIB maps as *auxiliary input features* to guide the deconvolution of the SO-band maps. Use the ground-truth tSZ maps to train a supervised model to predict the high-resolution tSZ signal, using the `utils.powers` function as a spectral regularizer to ensure the model does not violate the known power spectrum of the FLAMINGO gas distribution.
+
+Respond in the following format:
+
+\\begin{IDEA}
+<IDEA>
+\\end{IDEA}
+
+In <IDEA>, put the refined idea. 
+
+###### PROMPT ENDS ########
+
+\begin{IDEA}
+**Title**: Spectral-Spatial Super-Resolution Denoising for Baryonic Pressure Mapping
+
+**Description**: This objective implements a Super-Resolution Denoising Autoencoder (SR-DAE) to reconstruct 1-arcmin resolution tSZ Compton-y maps from SO LAT-band observations (90, 150, 217 GHz), utilizing high-frequency CIB maps (353–857 GHz) as auxiliary features to guide the recovery of small-scale gas pressure fluctuations. The architecture employs a multi-scale U-Net with gated cross-attention, enabling the model to learn the spatial correlation between CIB-traced star-forming regions and ionized gas flows without assuming deterministic coupling. To ensure physical validity, the training objective minimizes a composite loss function: a pixel-wise L1-reconstruction loss for the tSZ ground truth and a spectral consistency term calculated via `utils.powers` that penalizes deviations from the FLAMINGO-simulated tSZ power spectrum. By conditioning on per-patch SO and Planck noise realizations, the SR-DAE effectively disentangles the non-Gaussian tSZ signal from the Gaussian CMB background and instrument noise. This approach specifically targets the 1–5 arcmin scale, where baryonic feedback signatures are most prominent, while preventing the hallucination of features by constraining the latent space representation to the known physical power distribution of the simulation.
+\end{IDEA}
+
