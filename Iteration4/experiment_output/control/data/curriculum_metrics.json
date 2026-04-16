@@ -1,0 +1,1 @@
+{"initial": {"scatter_true": 0.22414590426475034, "scatter_pred": 0.22612209876856246, "scatter_diff": 0.037854742258787155}, "stage1": {"scatter_true": 0.22414590426475034, "scatter_pred": 0.2281277289890303, "scatter_diff": 0.04335208609700203}, "stage2": {"scatter_true": 0.22414590426475034, "scatter_pred": 0.23251920813663815, "scatter_diff": 0.036911267787218094}}

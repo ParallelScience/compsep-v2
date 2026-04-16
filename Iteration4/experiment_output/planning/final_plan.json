@@ -1,0 +1,82 @@
+{
+    "sub_tasks": [
+        {
+            "bullet_points": [
+                "Compute a per-patch tSZ intensity proxy (mean absolute Compton-y) from ground-truth maps to serve as the stratification criterion for train/validation/test splits.",
+                "Preload all stacked signal maps into memory-mapped arrays and compute/save global normalization statistics (median and IQR) using only the training set to prevent data leakage.",
+                "Implement a Dataset class that dynamically samples SO and Planck noise realizations, providing per-patch/per-frequency noise variance estimates as conditioning vectors.",
+                "Save dataset split indices and normalization parameters to disk."
+            ],
+            "sub_task": "Data Pipeline and Noise Conditioning",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Implement a multi-scale U-Net with gated cross-attention and a noise-conditioning branch using FiLM (Feature-wise Linear Modulation) to ingest noise variance estimates.",
+                "Define a composite loss function: pixel-wise L1 reconstruction loss and a differentiable spectral consistency term implemented via PyTorch FFT operations.",
+                "Implement a dynamic weighting schedule for the spectral loss.",
+                "Train the model on the training set, monitoring validation loss, and save the trained model weights and history."
+            ],
+            "sub_task": "Architecture and Spectral Fidelity",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Compute the transfer function T(ell) for the trained model using the validation set.",
+                "Produce a diagnostic plot of T(ell) with error bands (standard deviation across validation patches), clearly marking the ell > 5000 regime.",
+                "Print the mean T(ell) value in the range 3000 < ell < 8000 as a scalar summary metric.",
+                "Save the computed transfer function and metrics to disk."
+            ],
+            "sub_task": "Transfer Function Analysis",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Perform CIB-only reconstruction by setting SO-LAT channels to pure noise.",
+                "Calculate the pixel-wise correlation and the cross-power spectrum (using utils.powers) between the CIB-only output and the ground-truth tSZ map.",
+                "Save the correlation results, cross-power spectra, and diagnostic maps."
+            ],
+            "sub_task": "Causal Validation and Hallucination Testing",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Calculate residuals R = Truth - Reconstruction for the test set.",
+                "Produce a 2D plot of residual power spectrum versus truth power spectrum as a function of ell.",
+                "Compute the scale-dependent bias B(ell) = mean(R_ell) / mean(truth_ell) and print its value at ell approx 1000, 3000, 5000, 8000.",
+                "Save residual statistics and diagnostic plots."
+            ],
+            "sub_task": "Residual Analysis for Bias Detection",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Perform two-stage training: Stage 1 (fine-tuning the model from Step 2 using only the top 20% of patches ranked by tSZ intensity) followed by Stage 2 (full dataset).",
+                "Evaluate the High-Mass Cluster Benchmark at the end of both stages.",
+                "Measure the change in Y_SZ-M scatter to ensure stability and save metrics."
+            ],
+            "sub_task": "Curriculum Learning and Stability",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Identify cluster apertures by finding local maxima in ground-truth tSZ maps above a signal threshold.",
+                "Compute aperture-integrated Y_SZ within a 5-arcmin radius and bin by peak tSZ amplitude as a mass proxy.",
+                "Compare the scatter of the reconstructed Y_SZ-M relation against the ground truth.",
+                "Save the Y_SZ-M relation data and comparison plots."
+            ],
+            "sub_task": "Scientific Validation: Y_SZ-M Relation",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Synthesize all quantitative and qualitative results, including the transfer function, hallucination tests, residual bias, curriculum stability, and Y_SZ-M relation.",
+                "Compare SR-DAE results against a linear ILC baseline (or note its absence as a limitation).",
+                "Structure the Results section with clearly labeled subsections corresponding to each analysis step.",
+                "Provide a comprehensive assessment of the model’s physical fidelity and potential for baryonic pressure mapping."
+            ],
+            "sub_task": "Final Performance Reporting",
+            "sub_task_agent": "researcher"
+        }
+    ]
+}
