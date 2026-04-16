@@ -1,0 +1,54 @@
+\documentclass[]{article}
+
+\usepackage{amsmath}
+\usepackage{multirow}
+\usepackage{natbib}
+\usepackage{graphicx} 
+
+
+\begin{document}
+
+\subsection{Simulations and dataset}
+The data used to train and evaluate our models are derived from the FLAMINGO cosmological hydrodynamical simulations. We generate realistic sky patches that mimic the expected observations from the upcoming Simons Observatory (SO). Each data sample consists of a set of six multi-frequency maps corresponding to the SO frequency bands at 90, 150, 217, 353, 545, and 857 GHz. These maps include the thermal Sunyaev-Zel'dovich (tSZ) effect, the Cosmic Infrared Background (CIB), and instrumental noise characteristic of the SO. The ground truth is the clean, high-resolution (1-arcmin) tSZ Compton-$y$ map from the simulation.
+
+The full dataset comprises 1523 flat-sky patches. To ensure robust generalization and prevent data leakage, we employ a rigorous splitting strategy. First, we identify and isolate the top 5\% of patches containing the most massive galaxy clusters (based on peak tSZ signal) to form a dedicated Out-of-Distribution (OOD) test set. The remaining patches are then split into a training set (1066 patches), a validation set (228 patches), and a standard test set (229 patches).
+
+For network training, the six-channel input maps are normalized on a channel-by-channel basis using the global mean and standard deviation computed across the training set. The target tSZ maps are also normalized before being used in the training of the Conditional Diffusion Model.
+
+\subsection{Linear baseline models}
+To provide a benchmark for our deep learning framework, we implemented two standard linear component separation methods.
+\begin{itemize}
+    \item \textbf{Constrained Internal Linear Combination (cILC):} This method operates in map space, applying a set of weights to the multi-frequency observations to produce a single reconstructed map. The weights are calculated to minimize the variance of the output map under two constraints: unity response to the tSZ signal's frequency spectrum and zero response (nulling) to the CIB frequency spectrum. The spectral signatures for this process were derived directly from the FLAMINGO simulation data.
+    \item \textbf{Wiener Filter (WF):} This method operates in harmonic space. The filter is constructed using the angular power spectra of the signal (tSZ) and noise (instrumental noise and other foregrounds), estimated from the training dataset. It optimally suppresses modes where the noise power dominates the signal power, providing the minimum mean squared error linear reconstruction under the assumption of Gaussian statistics.
+\end{itemize}
+
+\subsection{Super-resolution denoising autoencoder}
+The first stage of our framework is a deterministic Super-Resolution Denoising Autoencoder (SR-DAE). The network architecture is based on a U-Net with gated cross-attention mechanisms, which allows the model to effectively leverage spatial information from the high-frequency CIB-dominated channels to guide the reconstruction of the tSZ signal in the lower-frequency channels.
+
+The SR-DAE is trained for 20 epochs to minimize a composite loss function $\mathcal{L}$, designed to enforce both pixel-level accuracy and statistical fidelity:
+\begin{equation}
+    \mathcal{L} = \mathcal{L}_{L1} + \lambda_1 \mathcal{L}_{spec} + \lambda_2 \mathcal{L}_{corr}
+\end{equation}
+where $\mathcal{L}_{L1}$ is the mean absolute error between the reconstructed map and the ground truth tSZ map, ensuring pixel-level accuracy. The spectral loss, $\mathcal{L}_{spec}$, penalizes differences between the power spectra of the reconstructed and true maps, ensuring that the statistical properties and physical structures across different angular scales are correctly recovered. The final term, $\mathcal{L}_{corr}$, is a normalized cross-correlation penalty between the reconstruction residual and the input CIB maps, which explicitly forces the model to learn a tSZ representation that is orthogonal to the CIB foregrounds.
+
+\subsection{Conditional diffusion model for uncertainty quantification}
+To move beyond a single point estimate and provide robust uncertainty quantification, we transition the deterministic SR-DAE into a probabilistic framework. We employ a Conditional Diffusion Model (CDM), which uses the pre-trained weights of the SR-DAE as its backbone. The CDM is trained to learn the full conditional probability distribution $p(\text{tSZ} | \text{Observed})$.
+
+The model is trained for 15 epochs using a linear noise schedule and mixed-precision computation to optimize the noise prediction task. During inference, we use a 50-step Denoising Diffusion Implicit Model (DDIM) sampler to generate multiple (10) realizations of the tSZ map for each input observation. The pixel-wise mean of these realizations serves as the final reconstructed map, while the pixel-wise variance provides a direct, well-motivated estimate of the reconstruction uncertainty.
+
+\subsection{Evaluation metrics}
+The performance of our models and the baselines is assessed through a comprehensive suite of metrics designed to probe different aspects of reconstruction quality.
+\begin{itemize}
+    \item \textbf{Out-of-Distribution Robustness:} We evaluate the models on the withheld OOD test set of massive clusters and on test patches injected with high levels of instrumental noise (95th percentile of noise realizations) to test their robustness to extreme physical conditions and low signal-to-noise regimes. A "Null Test," where pure noise maps are fed into the network, is used to ensure the model does not hallucinate signals.
+    \item \textbf{Power Spectrum Transfer Function:} To quantify the fidelity of the reconstruction in harmonic space, we compute the transfer function:
+    \begin{equation}
+        T(\ell) = \frac{C_{\ell}^{\text{cross}}}{C_{\ell}^{\text{true}}}
+    \end{equation}
+    where $C_{\ell}^{\text{cross}}$ is the cross-power spectrum between the reconstructed map and the ground truth, and $C_{\ell}^{\text{true}}$ is the auto-power spectrum of the ground truth map. A value of $T(\ell) \approx 1$ indicates a statistically unbiased recovery of power at angular scale $\ell$.
+    \item \textbf{Astrophysical Scaling Relation:} We validate the physical content of the reconstructed maps by measuring the integrated Compton-$y$ parameter, $Y_{SZ}$, for clusters and comparing it against a mass proxy (the peak tSZ signal). We then compare the scatter and bias of this $Y_{SZ}-M$ relation produced by each method.
+    \item \textbf{Uncertainty Calibration:} The reliability of the CDM-derived uncertainties is assessed using the Probability Integral Transform (PIT). A uniform PIT histogram indicates that the predicted uncertainties are statistically well-calibrated.
+    \item \textbf{Reconstruction Gain:} We quantify the overall improvement of our models over the linear baselines by computing the gain ratio, defined as the ratio of the residual power spectrum of the cILC reconstruction to that of the deep learning model, as a function of multipole $\ell$.
+\end{itemize}
+
+\end{document}
+                

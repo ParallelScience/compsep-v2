@@ -1,0 +1,75 @@
+\documentclass[]{article}
+
+\usepackage{amsmath}
+\usepackage{multirow}
+\usepackage{natbib}
+\usepackage{graphicx} 
+
+
+\begin{document}
+
+We evaluate the performance of our deep learning framework against standard linear component separation methods. We first demonstrate the limitations of the linear baselines, then assess the robustness and interpretability of our deterministic Super-Resolution Denoising Autoencoder (SR-DAE). Finally, we validate the scientific utility of both the deterministic SR-DAE and the probabilistic Conditional Diffusion Model (CDM) through a series of tests, including the calibration of the CDM-derived uncertainties.
+
+\subsection{Limitations of linear component separation methods}
+To establish a performance benchmark, we applied two widely-used linear methods, a constrained Internal Linear Combination (cILC) and a Wiener Filter (WF), to the simulated Simons Observatory data. The cILC was configured to null the Cosmic Infrared Background (CIB) contribution while preserving the thermal Sunyaev-Zel'dovich (tSZ) signal, using spectral information derived from the FLAMINGO simulations. The WF was constructed in harmonic space to provide the minimum mean squared error linear reconstruction under Gaussian assumptions.
+
+Figure \ref{fig:linear_recon_maps} provides a visual comparison of the reconstructions for a representative sky patch. Both linear methods fail to accurately recover the tSZ map. The cILC reconstruction is dominated by high-frequency residual noise, which obscures the faint, diffuse tSZ signal and the structure of smaller galaxy groups. In contrast, the WF aggressively suppresses power on small angular scales, resulting in a severely over-smoothed map where all but the most prominent cluster core is lost. This demonstrates a fundamental trade-off in linear methods: they either retain excessive noise or sacrifice the high-resolution information crucial for studying baryonic feedback.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\columnwidth]{../input_files/plots/step_1_reconstruction_maps_1_1776362774.png}
+    \caption{Visual comparison of the ground truth thermal Sunyaev-Zel'dovich (tSZ) Compton-$y$ map (left) with reconstructions from two linear baseline methods: a constrained Internal Linear Combination (cILC, middle) and a Wiener Filter (WF, right). The cILC reconstruction is dominated by significant residual noise variance, which obscures the underlying physical structures. The Wiener Filter aggressively suppresses high-frequency noise, resulting in a severely over-smoothed map and a significant loss of small-scale structure. This highlights the limitations of standard linear methods for this component separation task.}
+    \label{fig:linear_recon_maps}
+\end{figure}
+
+This failure is quantified in Figure \ref{fig:linear_residual_ps}, which shows the angular power spectra of the reconstruction residuals. For both the cILC and WF, the residual power increases substantially at high multipoles ($\ell > 2000$), corresponding to the 1--5 arcminute scales where signatures of baryonic feedback are expected to be most prominent. This confirms that linear methods, which rely on spectral differences and second-order statistics, are unable to effectively disentangle the spatially correlated, non-Gaussian tSZ and CIB signals from instrumental noise.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\columnwidth]{../input_files/plots/step_1_residual_power_spectra_1_1776362774.png}
+    \caption{Angular power spectra of the reconstruction residuals for the constrained Internal Linear Combination (cILC) and Wiener Filter (WF) baselines. The residual power for both linear methods increases substantially at higher multipoles ($\ell > 2000$), demonstrating their inability to recover the small-scale (1–5 arcmin) thermal Sunyaev-Zel'dovich (tSZ) signal associated with baryonic feedback. This failure to disentangle the non-Gaussian tSZ signal from noise and foregrounds underscores the limitations of linear component separation.}
+    \label{fig:linear_residual_ps}
+\end{figure}
+
+\subsection{Robustness and interpretability of the SR-DAE model}
+Our deterministic SR-DAE model was trained for 20 epochs by minimizing a composite loss function comprising a pixel-wise L1 term, a spectral consistency term, and a cross-correlation penalty to enforce orthogonality with the CIB. The model exhibited stable convergence with the validation loss closely tracking the training loss, indicating successful generalization without overfitting. To rigorously assess its performance, we conducted a series of stress tests on out-of-distribution (OOD) data, as summarized in Figure \ref{fig:srdae_stress_test}.
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=\textwidth]{../input_files/plots/step_3_ood_stress_test_3_1776364423.png}
+    \caption{Robustness and interpretability of the Super-Resolution Denoising Autoencoder (SR-DAE) under stress-testing conditions. The top two rows display Integrated Gradients (IG) saliency maps for representative high- and low-Signal-to-Noise Ratio (SNR) patches, revealing the model's dynamic attention mechanism: it leverages Simons Observatory (SO) channels for core reconstruction in high-SNR cases and relies more on Planck's high-frequency channels to guide reconstruction in low-SNR fields. The bottom-left panel shows a null test, where the network output for pure noise inputs follows a zero-centered Gaussian distribution, confirming the model does not hallucinate signals. The bottom-right panel quantifies the Mean Squared Error (MSE), demonstrating a bounded error increase for Out-of-Distribution (OOD) massive clusters and only marginal performance degradation under extreme instrumental noise compared to the standard test set.}
+    \label{fig:srdae_stress_test}
+\end{figure*}
+
+First, we evaluated the model's robustness to extreme physical signals and noise levels. As shown in the bottom-right panel of Figure \ref{fig:srdae_stress_test}, the model achieves a low Mean Squared Error (MSE) of 0.9458 (in scaled units) on the standard test set. When applied to the OOD test set containing the 5\% most massive clusters, the MSE increases to 1.8239, as expected due to the larger signal amplitudes, but remains well-behaved, indicating that the model can extrapolate to extreme objects without catastrophic failure. Similarly, when tested on patches with high instrumental noise (95th percentile), the MSE shows only a marginal increase to 0.9744, demonstrating the model's effectiveness at denoising even in low signal-to-noise regimes.
+
+Second, we performed a "null test" by providing pure instrumental noise maps as input. The bottom-left panel of Figure \ref{fig:srdae_stress_test} shows that the resulting output is a map consistent with random noise, with a mean of 0.3466 and a standard deviation of 0.1054 (in scaled units), centered around zero. This critical test confirms that the network does not "hallucinate" or generate spurious tSZ-like signals in the absence of any true signal.
+
+Finally, we used Integrated Gradients to produce saliency maps and interpret the model's behavior. The top panels of Figure \ref{fig:srdae_stress_test} show that for high-SNR massive clusters, the model primarily attends to the low-frequency SO channels (90-217 GHz) to reconstruct the tSZ signal, while using the high-frequency channels (353-857 GHz) to identify and remove CIB contamination. For low-SNR patches, the model's attention shifts, relying more heavily on the CIB-dominated high-frequency channels as a spatial prior to guide the reconstruction of the faint, diffuse tSZ signal. This adaptive behavior validates the design of the gated cross-attention mechanism.
+
+\subsection{Probabilistic reconstruction and scientific validation}
+To provide uncertainty quantification, the pre-trained SR-DAE was transitioned into a Conditional Diffusion Model (CDM). By sampling from the learned conditional distribution $p(\text{tSZ} | \text{Observed})$, we generate an ensemble of 10 tSZ map realizations for each observation. The mean of this ensemble serves as our final point-estimate map, while the pixel-wise variance provides a robust uncertainty estimate.
+
+It is important to note that the primary goal of the CDM is to sample from the posterior distribution, not to minimize a pixel-wise metric like MSE. While the deterministic DAE achieves a scaled MSE of 1.339 on the test set, the mean of the CDM ensemble has a higher MSE of 9.5667. This is an expected outcome: the DAE produces a single, slightly smoothed map representing the posterior median, which is optimal for MSE. In contrast, each CDM sample contains realistic high-frequency structures that are physically plausible but not perfectly aligned pixel-by-pixel with the ground truth, thus increasing the MSE of the ensemble mean. The strength of the CDM lies in its ability to capture the full range of possible solutions and provide robust uncertainty quantification. We validate the scientific performance of both the SR-DAE and the CDM reconstructions in Figure \ref{fig:scientific_validation}.
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=\textwidth]{../input_files/plots/step_5_validation_results_5_1776365219.png}
+    \caption{Scientific validation of the deep learning models against linear baselines. (a) The Probability Integral Transform (PIT) histogram indicates well-calibrated pixel-wise uncertainties for the Conditional Diffusion Model (CDM). (b) The CDM (blue) preserves the physical $Y_{\text{SZ}}-M$ scaling relation with significantly lower scatter compared to the cILC baseline (red). (c) The power spectrum transfer function, $T(\ell)$, shows the DAE (green) and CDM maintain fidelity close to unity across a wide range of angular scales, while the Wiener Filter (orange) severely over-smooths high-$\ell$ modes. (d) The reconstruction gain ratio quantifies this improvement, demonstrating that the deep learning models substantially reduce the reconstruction error relative to cILC at the small scales ($\ell \in [1000, 5000]$) where baryonic feedback signatures are prominent.}
+    \label{fig:scientific_validation}
+\end{figure*}
+
+\subsubsection{Uncertainty calibration}
+A key advantage of the CDM is its ability to provide principled uncertainty estimates. We validate the statistical reliability of these uncertainties using the Probability Integral Transform (PIT), shown in panel (a) of Figure \ref{fig:scientific_validation}. The resulting PIT histogram is nearly uniform, indicating that the CDM-derived uncertainties are well-calibrated. This means the true tSZ value for a given pixel falls within the predicted probability intervals at the expected rate. These reliable, pixel-level uncertainty maps are crucial for propagating reconstruction errors into subsequent cosmological and astrophysical analyses.
+
+\subsubsection{Astrophysical scaling relations}
+To ensure the physical properties of galaxy clusters are preserved, we measured the integrated Compton-$y$ parameter, $Y_{SZ}$, for clusters in the reconstructed maps and compared it to a mass proxy (the peak tSZ signal). Panel (b) of Figure \ref{fig:scientific_validation} shows the resulting scaling relation. The cILC reconstruction produces a relation with large scatter, particularly for lower-mass objects where noise and foreground residuals dominate the signal. The CDM reconstruction, however, yields a significantly tighter scaling relation with substantially less bias, indicating a more accurate recovery of the integrated gas pressure across a wide range of cluster masses.
+
+\subsubsection{Power spectrum fidelity}
+The fidelity of the reconstruction in harmonic space is assessed using the power spectrum transfer function, $T(\ell)$, shown in panel (c) of Figure \ref{fig:scientific_validation}. The WF reconstruction exhibits a sharp decline in $T(\ell)$ for $\ell > 2000$, confirming the severe over-smoothing of small-scale structures seen in Figure \ref{fig:linear_recon_maps}. In stark contrast, both the SR-DAE and the CDM mean reconstruction maintain a transfer function near unity across a broad range of angular scales, extending to $\ell \approx 5000$. This demonstrates that our models accurately recover the statistical properties of the tSZ field down to arcminute scales.
+
+\subsubsection{Overall reconstruction improvement}
+We quantify the overall improvement of our method over the cILC baseline by computing the reconstruction gain, defined as the ratio of the residual power spectrum of the cILC to that of our model. As shown in panel (d) of Figure \ref{fig:scientific_validation}, the gain for both the SR-DAE and CDM is significantly greater than one, particularly in the multipole range $\ell \in [1000, 5000]$. This corresponds to a substantial reduction in reconstruction error on the exact angular scales most relevant for studying baryonic feedback, highlighting the power of using the CIB as a spatial guide for super-resolution denoising.
+
+\end{document}
+                

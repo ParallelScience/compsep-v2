@@ -1,0 +1,59 @@
+\documentclass[]{article}
+
+\usepackage{amsmath}
+\usepackage{multirow}
+\usepackage{natbib}
+\usepackage{graphicx} 
+
+
+\begin{document}
+
+% Auto-generated figures file
+% \usepackage{graphicx}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.5\textwidth]{../input_files/plots/step_1_maps_1776363660.png}
+    \caption{Visual comparison of reconstructed thermal Sunyaev-Zel'dovich (tSZ) Compton-$y$ maps for a representative sky patch. The panels show the ground truth simulation (left), the reconstruction from a constrained Internal Linear Combination (cILC) method (center), and a Wiener Filter (WF) (right). The cILC reconstruction exhibits significant residual noise variance that obscures small-scale structures. In contrast, the WF aggressively suppresses high-frequency modes, resulting in an over-smoothed map with a detrimental loss of the physical tSZ signal, illustrating the failure of these linear baselines to recover non-Gaussian baryonic feedback signatures.}
+    \label{fig:image2}
+\end{figure}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.5\textwidth]{../input_files/plots/step_1_reconstruction_maps_1_1776362774.png}
+    \caption{Visual comparison of the ground truth thermal Sunyaev-Zel'dovich (tSZ) Compton-$y$ map (left) with reconstructions from two linear baseline methods: a constrained Internal Linear Combination (cILC, middle) and a Wiener Filter (WF, right). The cILC reconstruction is dominated by significant residual noise variance, which obscures the underlying physical structures. The Wiener Filter aggressively suppresses high-frequency noise, resulting in a severely over-smoothed map and a complete loss of the tSZ signal. This highlights the limitations of standard linear methods for this component separation task.}
+    \label{fig:image0}
+\end{figure}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.5\textwidth]{../input_files/plots/step_1_residual_power_spectra_1_1776362774.png}
+    \caption{Angular power spectra of the reconstruction residuals for the constrained Internal Linear Combination (cILC) and Wiener Filter (WF) baselines. The residual power for both linear methods increases substantially at higher multipoles ($\ell > 2000$), demonstrating their inability to recover the small-scale (1–5 arcmin) thermal Sunyaev-Zel'dovich (tSZ) signal associated with baryonic feedback. This failure to disentangle the non-Gaussian tSZ signal from noise and foregrounds underscores the limitations of linear component separation.}
+    \label{fig:image1}
+\end{figure}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.5\textwidth]{../input_files/plots/step_1_spectra_1776363660.png}
+    \caption{Angular power spectra of the reconstruction residuals for the constrained Internal Linear Combination (cILC) and Wiener Filter baselines, compared against the ground truth thermal Sunyaev-Zel'dovich (tSZ) power spectrum. The residual power for both linear methods increases substantially at high multipoles ($\ell > 2000$), corresponding to small angular scales where signatures of baryonic feedback are prominent. This highlights the inability of these linear methods to accurately recover the non-Gaussian tSZ signal from contaminated and noisy observations.}
+    \label{fig:image3}
+\end{figure}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.5\textwidth]{../input_files/plots/step_3_ood_stress_test_3_1776364423.png}
+    \caption{Robustness and interpretability of the Super-Resolution Denoising Autoencoder (SR-DAE) under stress-testing conditions. The top two rows display Integrated Gradients (IG) saliency maps for representative high- and low-Signal-to-Noise Ratio (SNR) patches, revealing the model's dynamic attention mechanism: it leverages Simons Observatory (SO) channels for core reconstruction in high-SNR cases and relies more on Planck's high-frequency channels to guide reconstruction in low-SNR fields. The bottom-left panel shows a null test, where the network output for pure noise inputs follows a zero-centered Gaussian distribution, confirming the model does not hallucinate signals. The bottom-right panel quantifies the Mean Squared Error (MSE), demonstrating a bounded error increase for Out-of-Distribution (OOD) massive clusters and only marginal performance degradation under extreme instrumental noise compared to the standard test set.}
+    \label{fig:image4}
+\end{figure}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.5\textwidth]{../input_files/plots/step_5_validation_results_5_1776365219.png}
+    \caption{Scientific validation of the deep learning models against linear baselines. (a) The Probability Integral Transform (PIT) histogram indicates well-calibrated pixel-wise uncertainties for the Conditional Diffusion Model (CDM). (b) The CDM (blue) preserves the physical $Y_{\text{SZ}}-M$ scaling relation with significantly lower scatter compared to the cILC baseline (red). (c) The power spectrum transfer function, $T(\ell)$, shows the DAE (green) and CDM maintain fidelity close to unity across a wide range of angular scales, while the Wiener Filter (orange) severely over-smooths high-$\ell$ modes. (d) The reconstruction gain ratio quantifies this improvement, demonstrating that the deep learning models substantially reduce the reconstruction error relative to cILC at the small scales ($\ell \in [1000, 5000]$) where baryonic feedback signatures are prominent.}
+    \label{fig:image5}
+\end{figure}
+
+
+
+\end{document}
+                

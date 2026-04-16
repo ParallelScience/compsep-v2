@@ -1,0 +1,28 @@
+\documentclass[]{article}
+
+\usepackage{amsmath}
+\usepackage{multirow}
+\usepackage{natbib}
+\usepackage{graphicx} 
+
+
+\begin{document}
+
+
+
+In this work, we have addressed the challenging problem of reconstructing high-resolution thermal Sunyaev-Zel'dovich (tSZ) maps from multi-frequency microwave sky observations. The primary difficulty lies in separating the faint tSZ signal from instrumental noise and the Cosmic Infrared Background (CIB), a foreground that is spatially correlated with the tSZ effect. Traditional linear component separation methods struggle with this task, often leading to reconstructions with significant residual noise or a loss of small-scale information. We introduced a deep learning framework that reframes this task as a guided super-resolution denoising problem, leveraging the CIB-dominated high-frequency channels as a spatial guide to reconstruct the tSZ map.
+
+Our framework consists of a two-stage model trained on realistic sky simulations based on the FLAMINGO simulation, designed to mimic observations from the upcoming Simons Observatory. The first stage is a Super-Resolution Denoising Autoencoder (SR-DAE), a U-Net with gated cross-attention, which produces a deterministic, high-fidelity tSZ map. The second stage transitions this model into a Conditional Diffusion Model (CDM), a probabilistic framework that learns the full conditional distribution of the tSZ map given the observations. This allows us to generate not only a point-estimate reconstruction but also robust, pixel-level uncertainty maps. We compared the performance of our models against two standard linear methods: a constrained Internal Linear Combination (cILC) and a Wiener Filter (WF).
+
+Our results demonstrate that the proposed deep learning framework significantly outperforms the linear baselines.
+\begin{itemize}
+    \item The SR-DAE and CDM models achieve a substantial reduction in reconstruction error compared to both cILC and WF, particularly on the 1--5 arcminute angular scales ($\ell \in [1000, 5000]$) that are crucial for studying baryonic feedback.
+    \item The models proved to be robust when tested on out-of-distribution data, including fields with extremely massive clusters and high levels of instrumental noise. A null test confirmed that the network does not generate spurious signals from noise-only inputs.
+    \item The reconstructions preserve the key statistical and physical properties of the tSZ field. The power spectrum transfer function remains close to unity across a wide range of scales, indicating an unbiased recovery of power. Furthermore, the reconstructed maps yield a tighter and less biased integrated tSZ signal-mass scaling relation for galaxy clusters.
+    \item The uncertainties derived from the CDM were shown to be statistically well-calibrated, as validated by a uniform Probability Integral Transform histogram. This provides a reliable method for quantifying reconstruction errors on a pixel-by-pixel basis.
+\end{itemize}
+
+We have learned that treating the CIB as a spatial guide rather than a contaminant to be removed is a highly effective strategy for tSZ map reconstruction. The combination of a deterministic deep learning model for high-fidelity mapping and a probabilistic diffusion model for uncertainty quantification provides a comprehensive solution that surpasses the capabilities of traditional linear methods. This framework delivers accurate tSZ maps with well-characterized uncertainties, paving the way for robust cosmological and astrophysical analyses of the intracluster and circumgalactic medium with the next generation of microwave surveys.
+
+\end{document}
+                

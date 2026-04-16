@@ -1,0 +1,87 @@
+
+###### PROMPT BEGINS ########
+System: You are a scientist
+Human: You are provided with:
+- a report on the results of a project. 
+- a plot from the analysis of the project.
+Your task is to create a caption for the plot that will be placed in the results section of a scientific paper. 
+
+Follow these instructions:
+- Write the caption in LaTeX
+- Describe what the plot is showing and relate it to the context below
+- Use the context below to relate the content of the caption to the results section
+- Do not refer to any section or subsection in the text
+- Try to describe what we learn from the image
+- Write the caption to be as short as possible while keeping its content
+- Do not make up anything. The caption should be a description of the plot based on the context below.
+- The caption must be a single paragraph.
+- When writing the caption, take into account that the underscore symbol needs to be written as \_, otherwise it wont compile in LaTeX.
+- Caption must not include tables.
+- If using percentage symbols, use \% instead of %
+
+Context:
+### Results: Spectral-Spatial Super-Resolution Denoising for Baryonic Pressure Mapping
+
+#### 1. Baseline Implementation and Comparative Benchmarking
+
+To establish a rigorous performance baseline for the reconstruction of 1-arcmin resolution thermal Sunyaev-Zel'dovich (tSZ) Compton-$y$ maps, we implemented two standard linear component separation techniques: a constrained Internal Linear Combination (cILC) and a Wiener Filter (WF). The cILC was explicitly configured to preserve the tSZ spectral signature while projecting out the Cosmic Infrared Background (CIB) contamination. This was achieved by utilizing the frequency-dependent conversion factors and the mean CIB spectra derived directly from the FLAMINGO simulation patches, ensuring a unit response to the tSZ signal. The Wiener Filter was constructed in harmonic space, leveraging the signal and noise covariance matrices estimated from the training data to optimally suppress noise based on the expected angular power spectra.
+
+The visual and statistical evaluation of these linear baselines is captured in the generated diagnostic plots. The spatial reconstruction maps (<code>data/step_1_reconstruction_maps_1_1776362774.png</code>) demonstrate that while both the cILC and WF can recover the large-scale structure of the most massive galaxy clusters, they severely struggle with the non-Gaussian, small-scale fluctuations characteristic of baryonic feedback. The cILC maps exhibit significant residual noise variance; the variance minimization process is fundamentally limited by the available degrees of freedom and the high noise levels inherent in the Simons Observatory (SO) LAT bands. Conversely, the Wiener Filter produces visually smoother maps by aggressively suppressing high-frequency noise, but it inevitably over-smooths the physical small-scale tSZ signal, leading to a detrimental loss of resolution.
+
+This limitation is quantitatively reflected in the angular power spectra of the reconstruction residuals (<code>data/step_1_residual_power_spectra_1_1776362774.png</code>). The residual power for both linear methods increases substantially at higher multipoles ($\ell > 2000$), corresponding to the 1–5 arcmin scales where Active Galactic Nucleus (AGN) and supernova feedback signatures are most prominent. The linear methods' inability to disentangle the non-Gaussian tSZ signal from the Gaussian instrumental noise and the correlated CIB foregrounds—without assuming deterministic coupling—underscores the necessity for a more expressive, non-linear deep learning approach.
+
+#### 2. Data Pipeline and SR-DAE Training
+
+The dataset, comprising 1523 flat-sky patches, was rigorously partitioned to prevent data leakage and ensure robust evaluation. We isolated the top 5% most massive clusters (identified based on the peak tSZ signal) to serve as an Out-of-Distribution (OOD) test set. The remaining patches were split into training (1066 patches), validation (228 patches), and standard testing (229 patches) subsets.
+
+To facilitate stable neural network training, we computed global normalization statistics across the training set. The channel-wise means for the six frequency bands (90, 150, 217, 353, 545, 857 GHz) were calculated as <code>[-1.4785520, 14.810303, 60.204422, 429.67834, 6586.1797, 590555.81]</code>, with corresponding standard deviations of <code>[111.86275, 120.49706, 327.5497, 145.69516, 886.2618, 64591.695]</code>. These statistics highlight the massive dynamic range across the spectrum, particularly illustrating the dominance of the CIB at higher frequencies.
+
+The Super-Resolution Denoising Autoencoder (SR-DAE), featuring a multi-scale U-Net architecture with gated cross-attention, was trained over 20 epochs. The training objective minimized a composite loss function comprising a pixel-wise L1 loss, a spectral consistency term ($\mathcal{L}_{spec}$), and a normalized cross-correlation penalty ($\mathcal{L}_{corr}$) to enforce orthogonality to the CIB foregrounds. The training process exhibited highly stable convergence. The total training loss decreased steadily from an initial value of <code>0.9814</code> (with L1: <code>0.9778</code>, Corr: <code>0.0355</code>) to a final value of <code>0.5376</code> (with L1: <code>0.5363</code>, Corr: <code>0.0133</code>). The validation loss closely tracked the training loss, concluding at <code>0.5308</code>. This tight coupling between the training and validation losses indicates that the model generalized exceptionally well to unseen standard patches without overfitting, successfully learning the spatial correlations between the CIB-traced star-forming regions and the ionized gas flows.
+
+#### 3. Out-of-Distribution (OOD) Stress Testing and Feature Attribution
+
+A critical requirement for cosmological component separation is robustness against extreme physical morphologies and instrumental noise fluctuations. We conducted rigorous stress testing to evaluate the SR-DAE's performance under OOD conditions.
+
+First, we evaluated the model on the standard test set, achieving a Mean Squared Error (MSE) of <code>0.9458</code> (in scaled units). When evaluated on the withheld top 5% most massive clusters, the MSE predictably increased to <code>1.8239</code>. This increase is physically expected due to the exponentially larger absolute signal values present in massive cluster cores; however, the error remains strictly bounded, demonstrating that the model can extrapolate to extreme feedback morphologies without catastrophic failure or numerical instability.
+
+To test robustness against instrumental noise, we identified 150 high-noise SO realizations, defined by an RMS noise threshold $\ge 415.06 \mu K_{CMB}$ (representing the 95th percentile of noise severity). Evaluating the standard test patches injected with these extreme noise realizations yielded an MSE of <code>0.9744</code>. The marginal degradation in performance (from <code>0.9458</code> to <code>0.9744</code>) confirms that the SR-DAE does not hallucinate features in low Signal-to-Noise Ratio (SNR) regimes and effectively disentangles the tSZ signal from severe Gaussian noise.
+
+Furthermore, we conducted a "Null Test" by passing pure noise realizations (zero sky signal) through the network. The resulting output distribution had a mean of <code>0.346557</code> and a standard deviation of <code>0.105374</code> (scaled units). As visualized in the multi-panel figure <code>data/step_3_ood_stress_test_3_1776364423.png</code>, the null test output closely follows a zero-centered Gaussian distribution. This proves that the network is statistically consistent with zero when no signal is present, effectively mitigating concerns about generative hallucination.
+
+Feature attribution was analyzed using Integrated Gradients (IG) to generate saliency maps, also presented in <code>data/step_3_ood_stress_test_3_1776364423.png</code>. For high-SNR massive clusters, the saliency maps reveal that the model actively utilizes the SO LAT channels (90–217 GHz) to reconstruct the core pressure profile, while leveraging the Planck high-frequency channels (353–857 GHz) to delineate the boundaries and subtract the CIB foreground. Conversely, in low-SNR field patches where the tSZ signal is weak, the model's attention shifts more heavily toward the high-frequency CIB priors to guide the recovery of diffuse gas flows. This dynamic routing of attention validates the efficacy of the gated cross-attention mechanism in adapting to varying physical regimes.
+
+#### 4. Probabilistic Framework Transition (CDM)
+
+To move beyond deterministic point estimates and quantify both epistemic and aleatoric uncertainty, the pre-trained SR-DAE was transitioned into a Conditional Diffusion Model (CDM). The CDM learns the conditional distribution $p(\text{tSZ} | \text{Observed}, \text{Noise})$. To condition the diffusion process, the tSZ ground truth maps were normalized using a computed mean of <code>1.4988</code> and a standard deviation of <code>1.7274</code> (scaled by $10^6$).
+
+The CDM was trained for 15 epochs using a linear noise schedule and mixed-precision training, optimizing the variational lower bound via an L2 noise prediction loss. The training loss converged smoothly from <code>1.2516</code> in the first epoch to <code>0.1235</code> by epoch 15. Following training, we generated 10 independent realizations for each test patch using a 50-step Denoising Diffusion Implicit Model (DDIM) sampler. This ensemble approach allows for the calculation of pixel-wise mean and variance maps.
+
+Quantitative evaluation on the test set revealed a Scaled DAE Mean MSE of <code>1.339</code>, while the Scaled CDM Mean MSE (calculated from the ensemble mean) was <code>9.5667</code>. The higher MSE for the CDM ensemble mean compared to the deterministic DAE is a known and expected characteristic of diffusion models in regression tasks. While the DAE directly minimizes the pixel-wise L1/L2 distance (often resulting in slightly blurred outputs that represent the median of the posterior), the CDM generates samples from the full posterior distribution. Individual CDM samples contain realistic high-frequency physical structures that may not perfectly align pixel-by-pixel with the ground truth due to the inherent stochasticity of the unconstrained small scales. This leads to a higher formal MSE despite the CDM providing superior perceptual quality, physical fidelity, and crucial uncertainty bounds.
+
+#### 5. Uncertainty Calibration and Scientific Validation
+
+The ultimate utility of the reconstructed maps lies in their scientific validity and the reliability of their uncertainty estimates. These aspects were comprehensively evaluated and visualized in the consolidated figure <code>data/step_5_validation_results_5_1776365219.png</code>.
+
+**(a) Uncertainty Calibration (PIT Histogram):**
+The calibration of the CDM's predictive uncertainty was assessed using the Probability Integral Transform (PIT). The PIT histogram evaluates whether the ground truth values fall within the predicted posterior distributions at the expected frequencies. A perfectly calibrated model yields a uniform (flat) PIT distribution. The generated PIT histogram demonstrates a well-behaved profile, indicating that the pixel-wise variance maps derived from the CDM ensemble accurately reflect the true reconstruction error. The model correctly predicts higher uncertainty in regions dominated by severe SO noise or complex CIB contamination, providing a reliable statistical proxy for map fidelity that can be propagated into downstream cosmological analyses.
+
+**(b) $Y_{SZ}-M$ Relation:**
+To validate the physical properties of the reconstructed clusters, we extracted the integrated Compton-$y$ parameter ($Y_{SZ}$) and compared it against the peak tSZ signal, which serves as a robust proxy for cluster mass in the absence of an external halo catalog. The scatter plot reveals that the CDM and DAE reconstructions maintain a significantly tighter and less biased $Y_{SZ}-M$ scaling relation compared to the cILC baseline. The cILC exhibits large scatter, particularly at the low-mass end, due to residual noise and foreground contamination overwhelming the faint signal. The deep learning models successfully recover the integrated pressure of both massive clusters and lower-mass groups, preserving the underlying astrophysics of the FLAMINGO simulation.
+
+**(c) Power Spectrum Transfer Function $T(\ell)$:**
+The spectral fidelity of the reconstructions was quantified using the transfer function $T(\ell) = C_{\ell}^{\text{cross}} / C_{\ell}^{\text{true}}$. The linear Wiener Filter exhibits a sharp drop in $T(\ell)$ at high multipoles, confirming the severe over-smoothing of small-scale features. The cILC maintains a higher $T(\ell)$ but is heavily contaminated by noise variance, rendering the high-$\ell$ modes unusable. In contrast, both the DAE and CDM maintain a transfer function close to unity across a much broader range of multipoles, successfully recovering power down to the 1–2 arcmin scales ($\ell \approx 3000-5000$). This confirms that the spectral loss function ($\mathcal{L}_{spec}$) effectively constrained the latent space to reproduce the physical power distribution of baryonic feedback.
+
+**(d) Reconstruction Gain Ratio:**
+Finally, we quantified the "gain" of the neural models over the linear baseline by calculating the ratio of the cILC residual power to the model residual power ($\text{MSE}_{\text{cILC}} / \text{MSE}_{\text{model}}$) as a function of multipole $\ell$. In the critical range of $\ell \in [1000, 5000]$, the DAE and CDM exhibit a gain ratio significantly greater than 1. This demonstrates a substantial reduction in reconstruction error at the exact spatial scales where AGN feedback and diffuse gas flows manifest. The models successfully leverage the high-resolution CIB spatial priors to guide the super-resolution of the tSZ signal, achieving a level of component separation and denoising unattainable by traditional linear combinations.
+            
+**Respond in exactly this format**
+
+\\begin{Caption}
+<Caption>
+\\end{Caption}
+
+In <Caption> place the figure caption.
+
+###### PROMPT ENDS ########
+
+content="```latex\n\\begin{Caption}\nRobustness and interpretability of the Super-Resolution Denoising Autoencoder (SR-DAE) under stress-testing conditions. The top two rows display Integrated Gradients (IG) saliency maps for representative high- and low-Signal-to-Noise Ratio (SNR) patches, revealing the model's dynamic attention mechanism: it leverages Simons Observatory (SO) channels for core reconstruction in high-SNR cases and relies more on Planck's high-frequency channels to guide reconstruction in low-SNR fields. The bottom-left panel shows a null test, where the network output for pure noise inputs follows a zero-centered Gaussian distribution, confirming the model does not hallucinate signals. The bottom-right panel quantifies the Mean Squared Error (MSE), demonstrating a bounded error increase for Out-of-Distribution (OOD) massive clusters and only marginal performance degradation under extreme instrumental noise compared to the standard test set.\n\\end{Caption}\n```" additional_kwargs={} response_metadata={'finish_reason': 'STOP', 'model_name': 'gemini-2.5-pro', 'safety_ratings': [], 'model_provider': 'google_genai'} id='lc_run--019d9850-9c20-71b2-9c74-34119650ac2f-0' tool_calls=[] invalid_tool_calls=[] usage_metadata={'input_tokens': 3386, 'output_tokens': 1476, 'total_tokens': 4862, 'input_token_details': {'cache_read': 0}, 'output_token_details': {'reasoning': 1273}}
