@@ -1,0 +1,71 @@
+{
+    "sub_tasks": [
+        {
+            "bullet_points": [
+                "Verify the `utils.powers` estimator by computing the power spectrum of a known Gaussian random field and comparing it against the theoretical input spectrum.",
+                "Perform a coordinate alignment check by computing the cross-correlation of the ground truth tSZ map with a 90-degree rotated version of itself to confirm no systematic spatial offsets.",
+                "Compute and print numerical diagnostics: mean, variance, and dynamic-range statistics for each ground-truth component map (tSZ, CMB, kSZ, and all CIB channels).",
+                "Save a multi-panel diagnostic plot showing the power spectrum comparison, the cross-correlation map, and the component statistics side-by-side."
+            ],
+            "sub_task": "Evaluation Pipeline and Coordinate Validation",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Implement a `torch.utils.data.Dataset` that handles the specific noise index requirements (Planck index matching, SO index independent).",
+                "Compute and save robust-scaling parameters (per-channel median and IQR) derived from the training set only.",
+                "Determine the soft-clipping threshold for tSZ empirically from the training-set 99.9th percentile distribution; print and save this threshold value.",
+                "Verify scaling by printing the post-scaling min/max/mean/std for each channel."
+            ],
+            "sub_task": "Data Pipeline and Preprocessing",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Implement the multi-scale U-Net with gated cross-attention.",
+                "Perform unit testing: verify forward pass output shapes and print total parameter count.",
+                "Ensure the model is compatible with mixed-precision training (FP16) on the RTX PRO 6000."
+            ],
+            "sub_task": "Model Architecture Implementation",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Implement each loss component (L1, wavelet, pseudo-Cl, flux) as a separately testable function.",
+                "Define the composite loss function $L = \\lambda_1 L_{L1} + \\lambda_2 L_{wavelet} + \\lambda_3 L_{pseudo-Cl} + \\lambda_4 L_{flux}$.",
+                "Set up the training loop with AdamW and a one-cycle learning rate scheduler.",
+                "Log the lambda annealing schedule for the flux term to a file."
+            ],
+            "sub_task": "Loss Function and Training Setup",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Select a 150-patch validation set via stratified sampling based on peak tSZ signal amplitudes; print the number of training and validation patches.",
+                "Train the model and print the epoch of best validation loss, along with final training and validation loss values.",
+                "Perform the Signal-Injection Test by injecting GNFW cluster profiles into pure noise maps at three distinct mass scales; report integrated-Y recovery fractions and radial profile residuals for each bin."
+            ],
+            "sub_task": "Model Training and Signal-Injection Testing",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Compute the cross-correlation coefficient $r_\\ell$ on the held-out validation set.",
+                "Perform the \"Bias-Variance\" check by binning residuals into 10 tSZ intensity bins; report mean and standard deviation per bin.",
+                "Generate Integrated Gradients saliency maps for representative high-mass cluster and low-mass filament patches.",
+                "Save all numerical results (r_ell, bias statistics, integrated-Y recovery) to a structured file."
+            ],
+            "sub_task": "Performance Assessment and Visualization",
+            "sub_task_agent": "engineer"
+        },
+        {
+            "bullet_points": [
+                "Synthesize quantitative results from Steps 1, 5, and 6, explicitly referencing the saved numerical outputs (power spectrum ratios, loss curves, r_ell, bias-variance statistics, integrated-Y recovery, and saliency interpretations).",
+                "Structure the Results section with delineated subsections: validation diagnostics, model training, signal-injection recovery, spectral coherence, bias analysis, and interpretability.",
+                "Write the full Results section of the report, summarizing the model's effectiveness in disentangling tSZ signals."
+            ],
+            "sub_task": "Final Results and Interpretation",
+            "sub_task_agent": "researcher"
+        }
+    ]
+}

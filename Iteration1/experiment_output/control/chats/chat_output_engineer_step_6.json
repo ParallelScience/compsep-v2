@@ -1,0 +1,268 @@
+[
+  {
+    "name": "control_starter",
+    "content": "",
+    "timestamp": "2026-04-16 10:12:01",
+    "cost": {
+      "Agent": [
+        "control_starter"
+      ],
+      "Model": [
+        "gemini-3.1-flash-lite-preview"
+      ],
+      "Cost": [
+        0.0010422500000000002
+      ],
+      "Prompt Tokens": [
+        4091
+      ],
+      "Completion Tokens": [
+        13
+      ],
+      "Total Tokens": [
+        4104
+      ]
+    }
+  },
+  {
+    "name": "_Group_Tool_Executor",
+    "content": "\n**Step number:** 6 out of 7.\n\n**Sub-task:** Performance Assessment and Visualization\n\n**Agent in charge of sub-task:** `engineer`\n\n**Instructions:**\n\n- Compute the cross-correlation coefficient $r_\\ell$ on the held-out validation set.\n- Perform the \"Bias-Variance\" check by binning residuals into 10 tSZ intensity bins; report mean and standard deviation per bin.\n- Generate Integrated Gradients saliency maps for representative high-mass cluster and low-mass filament patches.\n- Save all numerical results (r_ell, bias statistics, integrated-Y recovery) to a structured file.\n\n**Status:** in progress \u23f3\n",
+    "timestamp": "2026-04-16 10:12:01",
+    "cost": {
+      "Agent": [],
+      "Model": [],
+      "Cost": [],
+      "Prompt Tokens": [],
+      "Completion Tokens": [],
+      "Total Tokens": []
+    }
+  },
+  {
+    "name": "engineer",
+    "content": "**Code Explanation:**\n\nThe code performs the final performance assessment and visualization of the trained SR-DAE model. \n1. **Cross-Correlation Coefficient ($r_\\ell$)**: It evaluates the model on the held-out validation set, applying the inverse soft-clipping transformation to recover the physical tSZ Compton-y maps. It then computes the auto- and cross-power spectra between the predicted and true tSZ maps using `utils.powers`. The cross-correlation coefficient $r_\\ell$ is calculated as the ratio of the mean cross-spectrum to the geometric mean of the auto-spectra, quantifying the phase coherence across spatial scales.\n2. **Bias-Variance Check**: It flattens the true and predicted tSZ maps and bins the true tSZ intensities into 10 linearly spaced bins. For each bin, it computes the mean and standard deviation of the residuals (predicted - true), revealing any systematic underestimation in high-density regions or overestimation in low-density regions.\n3. **Integrated Gradients Saliency Maps**: It implements an Integrated Gradients module to generate saliency maps for a representative high-mass cluster (highest peak tSZ) and a low-mass filament (25th percentile peak tSZ). The baseline is set to zeros, which corresponds to the median background due to the robust scaling applied during preprocessing. The saliency maps are normalized by the input variance to ensure gradients reflect informative features rather than numerical magnitude. The mean absolute saliency across the main (SO) and auxiliary (Planck CIB) channels is visualized and saved.\n4. **Data Saving**: All numerical results, including $r_\\ell$, bias statistics, and the integrated-Y recovery from the previous step, are saved to a structured `.npz` file for the researcher agent to synthesize.\n\n**Python Code:**\n\n```python\nimport sys\nimport os\nimport time\nimport numpy as np\nimport torch\nimport matplotlib.pyplot as plt\nimport matplotlib\n\nmatplotlib.rcParams['text.usetex'] = False\n\nsys.path.insert(0, os.path.abspath(\"codebase\"))\nsys.path.insert(0, '/home/node/data/compsep_data')\nimport utils\nfrom step_2 import CompSepDataset\nfrom step_3 import SR_DAE\n\ndef get_power(a, b, ps=5.0):\n    \"\"\"\n    Computes the power spectrum using utils.powers and ensures the correct order of returns.\n    Returns (ell, cl).\n    \"\"\"\n    res = utils.powers(a, b, ps=ps)\n    if np.mean(res[0]) > np.mean(res[1]):\n        return res[0], res[1]\n    else:\n        return res[1], res[0]\n\ndef integrated_gradients(model, input_tensor, baseline_tensor, steps=50):\n    \"\"\"\n    Computes Integrated Gradients for an image-to-image model.\n    The target score is the sum of all output pixels.\n    \"\"\"\n    model.eval()\n    alphas = torch.linspace(0, 1, steps).view(-1, 1, 1, 1).to(input_tensor.device)\n    path = baseline_tensor + alphas * (input_tensor - baseline_tensor)\n    path.requires_grad = True\n    \n    preds = model(path)\n    score = preds.sum()\n    score.backward()\n    \n    grads = path.grad\n    avg_grads = grads.mean(dim=0, keepdim=True)\n    \n    ig = (input_tensor - baseline_tensor) * avg_grads\n    return ig\n\nif __name__ == '__main__':\n    print(\"Starting Performance Assessment and Visualization...\")\n    \n    data_dir = 'data/'\n    base_dir = '/home/node/data/compsep_data/cut_maps'\n    \n    # Load scaling params and indices\n    scaling_data = np.load(os.path.join(data_dir, 'scaling_params.npz'), allow_pickle=True)\n    scaling_params = scaling_data['scaling_params'].item()\n    tsz_clip_threshold = scaling_data['tsz_clip_threshold'].item()\n    val_indices = scaling_data['val_indices']\n    \n    # Load model\n    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')\n    model = SR_DAE(main_in_channels=3, aux_in_channels=3, out_channels=1).to(device)\n    model.load_state_dict(torch.load(os.path.join(data_dir, 'best_model.pth')))\n    model.eval()\n    \n    # Dataset\n    val_dataset = CompSepDataset(val_indices, base_dir, scaling_params, tsz_clip_threshold, split='val')\n    \n    all_pred_tsz = []\n    all_true_tsz = []\n    \n    print(\"Evaluating model on validation set...\")\n    with torch.no_grad():\n        for i in range(len(val_dataset)):\n            x, y = val_dataset[i]\n            x = x.unsqueeze(0).to(device)\n            pred = model(x)\n            pred_np = pred.squeeze().cpu().numpy()\n            \n            # Inverse soft-clipping\n            pred_clipped = np.clip(pred_np, -0.999 * tsz_clip_threshold, 0.999 * tsz_clip_threshold)\n            pred_physical = tsz_clip_threshold * np.arctanh(pred_clipped / tsz_clip_threshold)\n            \n            true_np = y.numpy()\n            true_clipped = np.clip(true_np, -0.999 * tsz_clip_threshold, 0.999 * tsz_clip_threshold)\n            true_physical = tsz_clip_threshold * np.arctanh(true_clipped / tsz_clip_threshold)\n            \n            all_pred_tsz.append(pred_physical)\n            all_true_tsz.append(true_physical)\n            \n    all_pred_tsz = np.array(all_pred_tsz)\n    all_true_tsz = np.array(all_true_tsz)\n    \n    print(\"Computing cross-correlation coefficient r_ell...\")\n    ell_list = []\n    cl_pt_list = []\n    cl_pp_list = []\n    cl_tt_list = []\n    \n    for pred, true in zip(all_pred_tsz, all_true_tsz):\n        ell, cl_pt = get_power(pred, true, ps=5.0)\n        _, cl_pp = get_power(pred, pred, ps=5.0)\n        _, cl_tt = get_power(true, true, ps=5.0)\n        \n        ell_list.append(ell)\n        cl_pt_list.append(cl_pt)\n        cl_pp_list.append(cl_pp)\n        cl_tt_list.append(cl_tt)\n        \n    ell = ell_list[0]\n    mean_cl_pt = np.mean(cl_pt_list, axis=0)\n    mean_cl_pp = np.mean(cl_pp_list, axis=0)\n    mean_cl_tt = np.mean(cl_tt_list, axis=0)\n    \n    r_ell = mean_cl_pt / np.sqrt(np.maximum(mean_cl_pp * mean_cl_tt, 1e-20))\n    \n    print(\"r_ell computed successfully.\")\n    print(\"r_ell values at different multipoles:\")\n    for e, r in zip(ell[::10], r_ell[::10]):\n        print(\"  ell=\" + (\"%.1f\" % e) + \": r_ell=\" + (\"%.4f\" % r))\n        \n    print(\"\\nPerforming Bias-Variance check...\")\n    true_flat = all_true_tsz.flatten()\n    pred_flat = all_pred_tsz.flatten()\n    residuals = pred_flat - true_flat\n    \n    bins = np.linspace(true_flat.min(), true_flat.max(), 11)\n    bin_centers = 0.5 * (bins[:-1] + bins[1:])\n    bias_mean = []\n    bias_std = []\n    \n    print(\"Bin Range\".rjust(25) + \" | \" + \"Mean Residual\".rjust(15) + \" | \" + \"Std Residual\".rjust(15) + \" | \" + \"Count\".rjust(10))\n    print(\"-\" * 75)\n    for i in range(10):\n        mask = (true_flat >= bins[i]) & (true_flat < bins[i+1])\n        if i == 9:\n            mask = (true_flat >= bins[i]) & (true_flat <= bins[i+1])\n        \n        count = np.sum(mask)\n        if count > 0:\n            b_mean = np.mean(residuals[mask])\n            b_std = np.std(residuals[mask])\n        else:\n            b_mean = np.nan\n            b_std = np.nan\n            \n        bias_mean.append(b_mean)\n        bias_std.append(b_std)\n        \n        if i == 9:\n            bin_range = \"[\" + (\"%.2e\" % bins[i]) + \", \" + (\"%.2e\" % bins[i+1]) + \"]\"\n        else:\n            bin_range = \"[\" + (\"%.2e\" % bins[i]) + \", \" + (\"%.2e\" % bins[i+1]) + \")\"\n            \n        print(bin_range.rjust(25) + \" | \" + (\"%.4e\" % b_mean).rjust(15) + \" | \" + (\"%.4e\" % b_std).rjust(15) + \" | \" + str(count).rjust(10))\n        \n    print(\"\\nGenerating Integrated Gradients saliency maps...\")\n    peak_tsz = np.max(all_true_tsz, axis=(1, 2))\n    high_mass_idx = np.argmax(peak_tsz)\n    p25 = np.percentile(peak_tsz, 25)\n    low_mass_idx = np.argmin(np.abs(peak_tsz - p25))\n    \n    print(\"Selected High-Mass Patch Index: \" + str(high_mass_idx) + \" (Peak tSZ: \" + (\"%.4e\" % peak_tsz[high_mass_idx]) + \")\")\n    print(\"Selected Low-Mass Patch Index: \" + str(low_mass_idx) + \" (Peak tSZ: \" + (\"%.4e\" % peak_tsz[low_mass_idx]) + \")\")\n    \n    def compute_and_plot_saliency(idx, name):\n        x, y = val_dataset[idx]\n        x_tensor = x.unsqueeze(0).to(device)\n        baseline = torch.zeros_like(x_tensor)\n        \n        ig = integrated_gradients(model, x_tensor, baseline, steps=50)\n        ig_np = ig.squeeze().cpu().detach().numpy()\n        \n        # Normalize by input variance\n        input_var = np.var(x.numpy(), axis=(1, 2), keepdims=True)\n        ig_normalized = ig_np / (input_var + 1e-8)\n        \n        # Main channels (SO) and Aux channels (Planck)\n        ig_main = np.mean(np.abs(ig_normalized[:3]), axis=0)\n        ig_aux = np.mean(np.abs(ig_normalized[3:]), axis=0)\n        \n        fig, axes = plt.subplots(1, 3, figsize=(18, 5))\n        \n        im0 = axes[0].imshow(all_true_tsz[idx], cmap='magma')\n        axes[0].set_title('True tSZ (' + name + ')\\n[dimensionless]')\n        fig.colorbar(im0, ax=axes[0], fraction=0.046, pad=0.04)\n        \n        im1 = axes[1].imshow(ig_main, cmap='viridis')\n        axes[1].set_title('Saliency: SO Channels\\n(Mean Abs, Normalized)')\n        fig.colorbar(im1, ax=axes[1], fraction=0.046, pad=0.04)\n        \n        im2 = axes[2].imshow(ig_aux, cmap='viridis')\n        axes[2].set_title('Saliency: Planck CIB Channels\\n(Mean Abs, Normalized)')\n        fig.colorbar(im2, ax=axes[2], fraction=0.046, pad=0.04)\n        \n        plt.tight_layout()\n        timestamp = str(int(time.time()))\n        plot_filename = os.path.join(data_dir, \"saliency_\" + name.replace(' ', '_').lower() + \"_\" + timestamp + \".png\")\n        plt.savefig(plot_filename, dpi=300, bbox_inches='tight')\n        print(\"Saliency plot saved to \" + plot_filename)\n        plt.close()\n        \n    compute_and_plot_saliency(high_mass_idx, \"High Mass Cluster\")\n    compute_and_plot_saliency(low_mass_idx, \"Low Mass Filament\")\n    \n    print(\"\\nSaving all numerical results to a structured file...\")\n    inj_results_path = os.path.join(data_dir, 'signal_injection_results.npz')\n    if os.path.exists(inj_results_path):\n        inj_data = np.load(inj_results_path, allow_pickle=True)\n        integrated_Y_recovery = inj_data['results']\n    else:\n        integrated_Y_recovery = np.array([])\n        print(\"Warning: signal_injection_results.npz not found.\")\n        \n    save_path = os.path.join(data_dir, 'performance_results.npz')\n    np.savez(save_path, \n             ell=ell, \n             r_ell=r_ell, \n             bias_bin_centers=bin_centers,\n             bias_mean=np.array(bias_mean),\n             bias_std=np.array(bias_std),\n             integrated_Y_recovery=integrated_Y_recovery)\n             \n    print(\"Numerical results saved to \" + save_path)\n    print(\"Performance Assessment and Visualization completed successfully.\")\n```",
+    "timestamp": "2026-04-16 10:14:21",
+    "cost": {
+      "Agent": [
+        "engineer"
+      ],
+      "Model": [
+        "gemini-3.1-pro-preview"
+      ],
+      "Cost": [
+        0.094016
+      ],
+      "Prompt Tokens": [
+        26644
+      ],
+      "Completion Tokens": [
+        3394
+      ],
+      "Total Tokens": [
+        30038
+      ]
+    }
+  },
+  {
+    "name": "engineer_response_evaluator",
+    "content": "**Code Explanation:**\n\nThe code performs the final performance assessment and visualization of the trained SR-DAE model. 1. Cross-Correlation Coefficient (r_ell): It evaluates the model on the held-out validation set, applying the inverse soft-clipping transformation to recover the physical tSZ Compton-y maps. It then computes the auto- and cross-power spectra between the predicted and true tSZ maps using utils.powers. The cross-correlation coefficient r_ell is calculated as the ratio of the mean cross-spectrum to the geometric mean of the auto-spectra, quantifying the phase coherence across spatial scales. 2. Bias-Variance Check: It flattens the true and predicted tSZ maps and bins the true tSZ intensities into 10 linearly spaced bins. For each bin, it computes the mean and standard deviation of the residuals (predicted - true), revealing any systematic underestimation in high-density regions or overestimation in low-density regions. 3. Integrated Gradients Saliency Maps: It implements an Integrated Gradients module to generate saliency maps for a representative high-mass cluster (highest peak tSZ) and a low-mass filament (25th percentile peak tSZ). The baseline is set to zeros, which corresponds to the median background due to the robust scaling applied during preprocessing. The saliency maps are normalized by the input variance to ensure gradients reflect informative features rather than numerical magnitude. The mean absolute saliency across the main (SO) and auxiliary (Planck CIB) channels is visualized and saved. 4. Data Saving: All numerical results, including r_ell, bias statistics, and the integrated-Y recovery from the previous step, are saved to a structured .npz file for the researcher agent to synthesize.\n\n**Modifications:**\n\nAdded if __name__ == '__main__': block, ensured all paths use data/ directory, removed LaTeX rendering, and fixed string formatting to avoid f-strings where necessary.\n\n**Python Code:**\n\n```python\n# filename: codebase/step_6.py\nimport sys\nimport os\nsys.path.insert(0, os.path.abspath(\"codebase\"))\nsys.path.insert(0, \"/home/node/data/compsep_data/\")\nimport time\nimport numpy as np\nimport torch\nimport matplotlib.pyplot as plt\nimport matplotlib\n\nmatplotlib.rcParams['text.usetex'] = False\n\nsys.path.insert(0, os.path.abspath('codebase'))\nsys.path.insert(0, '/home/node/data/compsep_data')\nimport utils\nfrom step_2 import CompSepDataset\nfrom step_3 import SR_DAE\n\ndef get_power(a, b, ps=5.0):\n    res = utils.powers(a, b, ps=ps)\n    if np.mean(res[0]) > np.mean(res[1]):\n        return res[0], res[1]\n    else:\n        return res[1], res[0]\n\ndef integrated_gradients(model, input_tensor, baseline_tensor, steps=50):\n    model.eval()\n    alphas = torch.linspace(0, 1, steps).view(-1, 1, 1, 1).to(input_tensor.device)\n    path = baseline_tensor + alphas * (input_tensor - baseline_tensor)\n    path.requires_grad = True\n    preds = model(path)\n    score = preds.sum()\n    score.backward()\n    grads = path.grad\n    avg_grads = grads.mean(dim=0, keepdim=True)\n    ig = (input_tensor - baseline_tensor) * avg_grads\n    return ig\n\nif __name__ == '__main__':\n    print('Starting Performance Assessment and Visualization...')\n    data_dir = 'data/'\n    base_dir = '/home/node/data/compsep_data/cut_maps'\n    scaling_data = np.load(os.path.join(data_dir, 'scaling_params.npz'), allow_pickle=True)\n    scaling_params = scaling_data['scaling_params'].item()\n    tsz_clip_threshold = scaling_data['tsz_clip_threshold'].item()\n    val_indices = scaling_data['val_indices']\n    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')\n    model = SR_DAE(main_in_channels=3, aux_in_channels=3, out_channels=1).to(device)\n    model.load_state_dict(torch.load(os.path.join(data_dir, 'best_model.pth')))\n    model.eval()\n    val_dataset = CompSepDataset(val_indices, base_dir, scaling_params, tsz_clip_threshold, split='val')\n    all_pred_tsz = []\n    all_true_tsz = []\n    print('Evaluating model on validation set...')\n    with torch.no_grad():\n        for i in range(len(val_dataset)):\n            x, y = val_dataset[i]\n            x = x.unsqueeze(0).to(device)\n            pred = model(x)\n            pred_np = pred.squeeze().cpu().numpy()\n            pred_clipped = np.clip(pred_np, -0.999 * tsz_clip_threshold, 0.999 * tsz_clip_threshold)\n            pred_physical = tsz_clip_threshold * np.arctanh(pred_clipped / tsz_clip_threshold)\n            true_np = y.numpy()\n            true_clipped = np.clip(true_np, -0.999 * tsz_clip_threshold, 0.999 * tsz_clip_threshold)\n            true_physical = tsz_clip_threshold * np.arctanh(true_clipped / tsz_clip_threshold)\n            all_pred_tsz.append(pred_physical)\n            all_true_tsz.append(true_physical)\n    all_pred_tsz = np.array(all_pred_tsz)\n    all_true_tsz = np.array(all_true_tsz)\n    print('Computing cross-correlation coefficient r_ell...')\n    ell_list = []\n    cl_pt_list = []\n    cl_pp_list = []\n    cl_tt_list = []\n    for pred, true in zip(all_pred_tsz, all_true_tsz):\n        ell, cl_pt = get_power(pred, true, ps=5.0)\n        _, cl_pp = get_power(pred, pred, ps=5.0)\n        _, cl_tt = get_power(true, true, ps=5.0)\n        ell_list.append(ell)\n        cl_pt_list.append(cl_pt)\n        cl_pp_list.append(cl_pp)\n        cl_tt_list.append(cl_tt)\n    ell = ell_list[0]\n    mean_cl_pt = np.mean(cl_pt_list, axis=0)\n    mean_cl_pp = np.mean(cl_pp_list, axis=0)\n    mean_cl_tt = np.mean(cl_tt_list, axis=0)\n    r_ell = mean_cl_pt / np.sqrt(np.maximum(mean_cl_pp * mean_cl_tt, 1e-20))\n    print('r_ell computed successfully.')\n    for e, r in zip(ell[::10], r_ell[::10]):\n        print('  ell=' + ('%.1f' % e) + ': r_ell=' + ('%.4f' % r))\n    print('\\nPerforming Bias-Variance check...')\n    true_flat = all_true_tsz.flatten()\n    pred_flat = all_pred_tsz.flatten()\n    residuals = pred_flat - true_flat\n    bins = np.linspace(true_flat.min(), true_flat.max(), 11)\n    bin_centers = 0.5 * (bins[:-1] + bins[1:])\n    bias_mean = []\n    bias_std = []\n    print('Bin Range'.rjust(25) + ' | ' + 'Mean Residual'.rjust(15) + ' | ' + 'Std Residual'.rjust(15) + ' | ' + 'Count'.rjust(10))\n    print('-' * 75)\n    for i in range(10):\n        mask = (true_flat >= bins[i]) & (true_flat < bins[i+1])\n        if i == 9:\n            mask = (true_flat >= bins[i]) & (true_flat <= bins[i+1])\n        count = np.sum(mask)\n        if count > 0:\n            b_mean = np.mean(residuals[mask])\n            b_std = np.std(residuals[mask])\n        else:\n            b_mean = np.nan\n            b_std = np.nan\n        bias_mean.append(b_mean)\n        bias_std.append(b_std)\n        if i == 9:\n            bin_range = '[' + ('%.2e' % bins[i]) + ', ' + ('%.2e' % bins[i+1]) + ']'\n        else:\n            bin_range = '[' + ('%.2e' % bins[i]) + ', ' + ('%.2e' % bins[i+1]) + ')'\n        print(bin_range.rjust(25) + ' | ' + ('%.4e' % b_mean).rjust(15) + ' | ' + ('%.4e' % b_std).rjust(15) + ' | ' + str(count).rjust(10))\n    print('\\nGenerating Integrated Gradients saliency maps...')\n    peak_tsz = np.max(all_true_tsz, axis=(1, 2))\n    high_mass_idx = np.argmax(peak_tsz)\n    p25 = np.percentile(peak_tsz, 25)\n    low_mass_idx = np.argmin(np.abs(peak_tsz - p25))\n    print('Selected High-Mass Patch Index: ' + str(high_mass_idx) + ' (Peak tSZ: ' + ('%.4e' % peak_tsz[high_mass_idx]) + ')')\n    print('Selected Low-Mass Patch Index: ' + str(low_mass_idx) + ' (Peak tSZ: ' + ('%.4e' % peak_tsz[low_mass_idx]) + ')')\n    def compute_and_plot_saliency(idx, name):\n        x, y = val_dataset[idx]\n        x_tensor = x.unsqueeze(0).to(device)\n        baseline = torch.zeros_like(x_tensor)\n        ig = integrated_gradients(model, x_tensor, baseline, steps=50)\n        ig_np = ig.squeeze().cpu().detach().numpy()\n        input_var = np.var(x.numpy(), axis=(1, 2), keepdims=True)\n        ig_normalized = ig_np / (input_var + 1e-8)\n        ig_main = np.mean(np.abs(ig_normalized[:3]), axis=0)\n        ig_aux = np.mean(np.abs(ig_normalized[3:]), axis=0)\n        fig, axes = plt.subplots(1, 3, figsize=(18, 5))\n        im0 = axes[0].imshow(all_true_tsz[idx], cmap='magma')\n        axes[0].set_title('True tSZ (' + name + ')\\n[dimensionless]')\n        fig.colorbar(im0, ax=axes[0], fraction=0.046, pad=0.04)\n        im1 = axes[1].imshow(ig_main, cmap='viridis')\n        axes[1].set_title('Saliency: SO Channels\\n(Mean Abs, Normalized)')\n        fig.colorbar(im1, ax=axes[1], fraction=0.046, pad=0.04)\n        im2 = axes[2].imshow(ig_aux, cmap='viridis')\n        axes[2].set_title('Saliency: Planck CIB Channels\\n(Mean Abs, Normalized)')\n        fig.colorbar(im2, ax=axes[2], fraction=0.046, pad=0.04)\n        plt.tight_layout()\n        timestamp = str(int(time.time()))\n        plot_filename = os.path.join(data_dir, 'saliency_' + name.replace(' ', '_').lower() + '_' + timestamp + '.png')\n        plt.savefig(plot_filename, dpi=300, bbox_inches='tight')\n        print('Saliency plot saved to ' + plot_filename)\n        plt.close()\n    compute_and_plot_saliency(high_mass_idx, 'High Mass Cluster')\n    compute_and_plot_saliency(low_mass_idx, 'Low Mass Filament')\n    print('\\nSaving all numerical results to a structured file...')\n    inj_results_path = os.path.join(data_dir, 'signal_injection_results.npz')\n    if os.path.exists(inj_results_path):\n        inj_data = np.load(inj_results_path, allow_pickle=True)\n        integrated_Y_recovery = inj_data['results']\n    else:\n        integrated_Y_recovery = np.array([])\n        print('Warning: signal_injection_results.npz not found.')\n    save_path = os.path.join(data_dir, 'performance_results.npz')\n    np.savez(save_path, ell=ell, r_ell=r_ell, bias_bin_centers=bin_centers, bias_mean=np.array(bias_mean), bias_std=np.array(bias_std), integrated_Y_recovery=integrated_Y_recovery)\n    print('Numerical results saved to ' + save_path)\n    print('Performance Assessment and Visualization completed successfully.')\n```",
+    "timestamp": "2026-04-16 10:14:30",
+    "cost": {
+      "Agent": [
+        "engineer_response_evaluator"
+      ],
+      "Model": [
+        "gemini-3.1-flash-lite-preview"
+      ],
+      "Cost": [
+        0.0069265
+      ],
+      "Prompt Tokens": [
+        7870
+      ],
+      "Completion Tokens": [
+        3306
+      ],
+      "Total Tokens": [
+        11176
+      ]
+    }
+  },
+  {
+    "name": "executor",
+    "content": "Execution results:\n\nExecution output: \nStarting Performance Assessment and Visualization...\nEvaluating model on validation set...\nComputing cross-correlation coefficient r_ell...\nr_ell computed successfully.\n  ell=32.7: r_ell=-0.0000\n  ell=687.7: r_ell=-0.0000\n  ell=1342.6: r_ell=-0.0000\n  ell=1997.6: r_ell=-0.0000\n  ell=2652.5: r_ell=-0.0000\n  ell=3307.5: r_ell=-0.0000\n  ell=3962.4: r_ell=0.0000\n  ell=4617.4: r_ell=0.0000\n  ell=5272.3: r_ell=0.0000\n  ell=5927.2: r_ell=0.0000\n  ell=6582.2: r_ell=0.0000\n  ell=7237.1: r_ell=0.0000\n  ell=7892.1: r_ell=-0.0000\n  ell=8547.0: r_ell=0.0000\n  ell=9202.0: r_ell=-0.0000\n  ell=9856.9: r_ell=0.0000\n  ell=10511.9: r_ell=0.0000\n  ell=11166.8: r_ell=0.0000\n  ell=11821.7: r_ell=0.0000\n  ell=12476.7: r_ell=0.0000\n\nPerforming Bias-Variance check...\n                Bin Range |   Mean Residual |    Std Residual |      Count\n---------------------------------------------------------------------------\n    [-1.08e-06, 7.30e-06) |     -1.8476e-06 |      8.2270e-05 |    9719496\n     [7.30e-06, 1.57e-05) |     -1.2751e-05 |      8.2257e-05 |      90371\n     [1.57e-05, 2.40e-05) |     -2.5064e-05 |      8.2152e-05 |      13303\n     [2.40e-05, 3.24e-05) |     -3.5968e-05 |      8.2006e-05 |       3940\n     [3.24e-05, 4.08e-05) |     -4.4908e-05 |      8.2138e-05 |       1551\n     [4.08e-05, 4.92e-05) |     -6.1743e-05 |      8.0687e-05 |        786\n     [4.92e-05, 5.75e-05) |     -6.9123e-05 |      8.0845e-05 |        396\n     [5.75e-05, 6.59e-05) |     -8.5251e-05 |      7.9141e-05 |        234\n     [6.59e-05, 7.43e-05) |     -1.0790e-04 |      7.3026e-05 |        121\n     [7.43e-05, 8.26e-05] |     -1.2679e-04 |      6.8992e-05 |        202\n\nGenerating Integrated Gradients saliency maps...\nSelected High-Mass Patch Index: 109 (Peak tSZ: 8.2646e-05)\nSelected Low-Mass Patch Index: 37 (Peak tSZ: 5.4702e-05)\nSaliency plot saved to data/saliency_high_mass_cluster_1776334475.png\nSaliency plot saved to data/saliency_low_mass_filament_1776334476.png\n\nSaving all numerical results to a structured file...\nNumerical results saved to data/performance_results.npz\nPerformance Assessment and Visualization completed successfully.\n",
+    "timestamp": "2026-04-16 10:14:38",
+    "cost": {
+      "Agent": [],
+      "Model": [],
+      "Cost": [],
+      "Prompt Tokens": [],
+      "Completion Tokens": [],
+      "Total Tokens": []
+    }
+  },
+  {
+    "name": "execution_recorder",
+    "content": "Code execution recorded.\n\nExecution output:\nExecution results:\n\nExecution output: \nStarting Performance Assessment and Visualization...\nEvaluating model on validation set...\nComputing cross-correlation coefficient r_ell...\nr_ell computed successfully.\n  ell=32.7: r_ell=-0.0000\n  ell=687.7: r_ell=-0.0000\n  ell=1342.6: r_ell=-0.0000\n  ell=1997.6: r_ell=-0.0000\n  ell=2652.5: r_ell=-0.0000\n  ell=3307.5: r_ell=-0.0000\n  ell=3962.4: r_ell=0.0000\n  ell=4617.4: r_ell=0.0000\n  ell=5272.3: r_ell=0.0000\n  ell=5927.2: r_ell=0.0000\n  ell=6582.2: r_ell=0.0000\n  ell=7237.1: r_ell=0.0000\n  ell=7892.1: r_ell=-0.0000\n  ell=8547.0: r_ell=0.0000\n  ell=9202.0: r_ell=-0.0000\n  ell=9856.9: r_ell=0.0000\n  ell=10511.9: r_ell=0.0000\n  ell=11166.8: r_ell=0.0000\n  ell=11821.7: r_ell=0.0000\n  ell=12476.7: r_ell=0.0000\n\nPerforming Bias-Variance check...\n                Bin Range |   Mean Residual |    Std Residual |      Count\n---------------------------------------------------------------------------\n    [-1.08e-06, 7.30e-06) |     -1.8476e-06 |      8.2270e-05 |    9719496\n     [7.30e-06, 1.57e-05) |     -1.2751e-05 |      8.2257e-05 |      90371\n     [1.57e-05, 2.40e-05) |     -2.5064e-05 |      8.2152e-05 |      13303\n     [2.40e-05, 3.24e-05) |     -3.5968e-05 |      8.2006e-05 |       3940\n     [3.24e-05, 4.08e-05) |     -4.4908e-05 |      8.2138e-05 |       1551\n     [4.08e-05, 4.92e-05) |     -6.1743e-05 |      8.0687e-05 |        786\n     [4.92e-05, 5.75e-05) |     -6.9123e-05 |      8.0845e-05 |        396\n     [5.75e-05, 6.59e-05) |     -8.5251e-05 |      7.9141e-05 |        234\n     [6.59e-05, 7.43e-05) |     -1.0790e-04 |      7.3026e-05 |        121\n     [7.43e-05, 8.26e-05] |     -1.2679e-04 |      6.8992e-05 |        202\n\nGenerating Integrated Gradients saliency maps...\nSelected High-Mass Patch Index: 109 (Peak tSZ: 8.2646e-05)\nSelected Low-Mass Patch Index: 37 (Peak tSZ: 5.4702e-05)\nSaliency plot saved to data/saliency_high_mass_cluster_1776334475.png\nSaliency plot saved to data/saliency_low_mass_filament_1776334476.png\n\nSaving all numerical results to a structured file...\nNumerical results saved to data/performance_results.npz\nPerformance Assessment and Visualization completed successfully.\n",
+    "timestamp": "2026-04-16 10:14:38",
+    "cost": {
+      "Agent": [],
+      "Model": [],
+      "Cost": [],
+      "Prompt Tokens": [],
+      "Completion Tokens": [],
+      "Total Tokens": []
+    }
+  },
+  {
+    "name": "executor_response_evaluator",
+    "content": "",
+    "timestamp": "2026-04-16 10:14:38",
+    "cost": {
+      "Agent": [
+        "executor_response_evaluator"
+      ],
+      "Model": [
+        "gemini-3.1-flash-lite-preview"
+      ],
+      "Cost": [
+        0.00052225
+      ],
+      "Prompt Tokens": [
+        1909
+      ],
+      "Completion Tokens": [
+        30
+      ],
+      "Total Tokens": [
+        1939
+      ]
+    }
+  },
+  {
+    "name": "_Group_Tool_Executor",
+    "content": "Code execution successful. 2 new image(s) generated.\n\n\nxxxxxxxxxxxxxxxxxxxxxxxxxx\n\nWorkflow status:\n\nPlan step number: 6\n\nAgent for sub-task (might be different from the next agent suggestion for debugging): engineer\n\nStep status (before execution): in progress\n\nCode status: success\n\nxxxxxxxxxxxxxxxxxxxxxxxxxx\n\n\nPlease review the generated images and provide feedback.",
+    "timestamp": "2026-04-16 10:14:38",
+    "cost": {
+      "Agent": [],
+      "Model": [],
+      "Cost": [],
+      "Prompt Tokens": [],
+      "Completion Tokens": [],
+      "Total Tokens": []
+    }
+  },
+  {
+    "name": "image_reviewer",
+    "content": "[{'type': 'text', 'text': \"**Needs Revision:** no\\n\\n**Issues:**\\nNone\\n\\n**Suggestions:**\\nNone\\n\\n**Summary:**\\nThe generated images successfully display the Integrated Gradients saliency maps for both a high-mass cluster and a low-mass filament patch, as requested. The plots are well-organized, with clear titles, appropriate colormaps, and readable labels. The comparison between the true tSZ signal and the saliency maps for different frequency channel groups (SO and Planck CIB) provides valuable insight into the model's focus. The visual quality is high, and the scientific representation is accurate.\", 'extras': {'signature': 'EjQKMgG+Pvb74Is7eucxgcOaoyKCdo1+fQ+5jiB5gwXFDZaEKVHIrFcAacLckxQwEmzDgcx6'}}]",
+    "timestamp": "2026-04-16 10:14:42",
+    "cost": {
+      "Agent": [
+        "image_reviewer"
+      ],
+      "Model": [
+        "gemini-3.1-flash-image-preview"
+      ],
+      "Cost": [
+        0.00033345
+      ],
+      "Prompt Tokens": [
+        3966
+      ],
+      "Completion Tokens": [
+        120
+      ],
+      "Total Tokens": [
+        4086
+      ]
+    }
+  },
+  {
+    "name": "image_review_recorder",
+    "content": "",
+    "timestamp": "2026-04-16 10:14:43",
+    "cost": {
+      "Agent": [
+        "image_review_recorder"
+      ],
+      "Model": [
+        "gemini-3.1-flash-lite-preview"
+      ],
+      "Cost": [
+        0.0003265
+      ],
+      "Prompt Tokens": [
+        544
+      ],
+      "Completion Tokens": [
+        127
+      ],
+      "Total Tokens": [
+        671
+      ]
+    }
+  },
+  {
+    "name": "_Group_Tool_Executor",
+    "content": "Image review passed. Step marked as complete.\n\nSummary: The generated images successfully display the Integrated Gradients saliency maps for both a high-mass cluster and a low-mass filament patch, as requested. The plots are well-organized, with clear titles, appropriate colormaps, and readable labels. The comparison between the true tSZ signal and the saliency maps for different frequency channel groups (SO and Planck CIB) provides valuable insight into the model's focus. The visual quality is high, and the scientific representation is accurate.",
+    "timestamp": "2026-04-16 10:14:43",
+    "cost": {
+      "Agent": [],
+      "Model": [],
+      "Cost": [],
+      "Prompt Tokens": [],
+      "Completion Tokens": [],
+      "Total Tokens": []
+    }
+  },
+  {
+    "name": "controller",
+    "content": "",
+    "timestamp": "2026-04-16 10:14:45",
+    "cost": {
+      "Agent": [
+        "controller"
+      ],
+      "Model": [
+        "gemini-3.1-flash-lite-preview"
+      ],
+      "Cost": [
+        0.00533725
+      ],
+      "Prompt Tokens": [
+        21241
+      ],
+      "Completion Tokens": [
+        18
+      ],
+      "Total Tokens": [
+        21259
+      ]
+    }
+  },
+  {
+    "name": "_Group_Tool_Executor",
+    "content": "\n**Step number:** 6 out of 7.\n\n**Sub-task:** Performance Assessment and Visualization\n\n**Agent in charge of sub-task:** `engineer`\n\n**Instructions:**\n\n- Compute the cross-correlation coefficient $r_\\ell$ on the held-out validation set.\n- Perform the \"Bias-Variance\" check by binning residuals into 10 tSZ intensity bins; report mean and standard deviation per bin.\n- Generate Integrated Gradients saliency maps for representative high-mass cluster and low-mass filament patches.\n- Save all numerical results (r_ell, bias statistics, integrated-Y recovery) to a structured file.\n\n**Step status:** completed \u2705\n\n**Code status:** success\n\n**Step iteration:** 0/10\n        ",
+    "timestamp": "2026-04-16 10:14:45",
+    "cost": {
+      "Agent": [],
+      "Model": [],
+      "Cost": [],
+      "Prompt Tokens": [],
+      "Completion Tokens": [],
+      "Total Tokens": []
+    }
+  },
+  {
+    "name": "terminator",
+    "content": "TERMINATE",
+    "timestamp": "2026-04-16 10:14:45",
+    "cost": {
+      "Agent": [],
+      "Model": [],
+      "Cost": [],
+      "Prompt Tokens": [],
+      "Completion Tokens": [],
+      "Total Tokens": []
+    }
+  }
+]
